@@ -105,6 +105,20 @@ const scrapeWatch = async (id) => {
                 format: 'mp4'
             });
 
+            // Dynamically check if the -sub version exists before adding
+            const mp4SubSrc = `https://r2.1hanime.com/${episodeId}-sub.mp4`;
+            try {
+                const headRes = await axios.head(mp4SubSrc);
+                if (headRes.status === 200) {
+                    results.sources.push({
+                        src: mp4SubSrc,
+                        format: 'mp4'
+                    });
+                }
+            } catch (e) {
+                // -sub version not available, do nothing
+            }
+
             if (!id.includes('-episode')) {
                 results.sources.push({
                     src: `https://r2.1hanime.com/${id}.mp4`,
@@ -419,4 +433,4 @@ const scrapeRandom = async () => {
         
 
 
-module.exports = { scrapeRecent, scrapeTrending, scrapeInfo, scrapeWatch, scrapeSearch, scrapeGenre, scrapeRandom }; 
+module.exports = { scrapeRecent, scrapeTrending, scrapeInfo, scrapeWatch, scrapeSearch, scrapeGenre, scrapeRandom };
