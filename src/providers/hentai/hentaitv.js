@@ -3,6 +3,7 @@ const cheerio = require('cheerio');
 const { extractPhpPlayer } = require('./php-extractor'); // Add this at the top if you want to use it directly
 
 const BASE_URL = 'https://hentai.tv';
+const EXTRACTOR_API_URL = process.env.EXTRACTOR_API_URL || 'http://localhost:3000/api/extractor';
 
 // Simple in-memory cache
 const cache = {};
@@ -74,7 +75,7 @@ const scrapeInfo = async (id) => {
     });
 };
 
-const scrapeWatch = async (id, req = null) => {
+const scrapeWatch = async (id) => {
     return getCachedData(`watch-${id}`, async () => {
         try {
             const cookies = '_ga=GA1.2.429696562.1742835944; _ga_NQCLWCJB86=GS1.1.1742835943.1.1.1742835957.0.0.0; _gid=GA1.2.152942901.1742835944; cfz_google-analytics=%7B%22YdnQ__ga%22%3A%7B%22v%22%3A%221e12f7e9-9dc5-4030-8cef-066c87fcc3de%22%2C%22e%22%3A1774371944261%7D%7D; cfz_google-analytics_v4=%7B%221fd5_engagementDuration%22%3A%7B%22v%22%3A%220%22%2C%22e%22%3A1774372087980%7D%2C%221fd5_engagementStart%22%3A%7B%22v%22%3A1742836152759%2C%22e%22%3A1774372152958%7D%2C%221fd5_counter%22%3A%7B%22v%22%3A%224%22%2C%22e%22%3A1774372087980%7D%2C%221fd5_ga4sid%22%3A%7B%22v%22%3A%221960823239%22%2C%22e%22%3A1742837887980%7D%2C%221fd5_session_counter%22%3A%7B%22v%22%3A%221%22%2C%22e%22%3A1774372087980%7D%2C%221fd5_ga4%22%3A%7B%22v%22%3A%22ee0dd41e-7ab6-446d-9783-ac6ea2260063%22%2C%22e%22%3A1774372087980%7D%2C%221fd5_let%22%3A%7B%22v%22%3A%221742836087980%22%2C%22e%22%3A1774372087980%7D%7D; cfzs_google-analytics_v4=%7B%221fd5_pageviewCounter%22%3A%7B%22v%22%3A%222%22%7D%7D; inter=1'; 
@@ -96,16 +97,10 @@ const scrapeWatch = async (id, req = null) => {
             const videoIframe = $('.aspect-video iframe');
             if (videoIframe.length) {
                 const iframeUrl = videoIframe.attr('src');
-                // Dynamically determine extractor endpoint
-                let extractorBase;
-                if (req && req.protocol && req.get) {
-                    extractorBase = `${req.protocol}://${req.get('host')}`;
-                } else {
-                    extractorBase = process.env.EXTRACTOR_BASE_URL || 'http://localhost:3000';
-                }
+                // Call your own extractor endpoint
                 try {
                     const extractorRes = await axios.get(
-                        `${extractorBase}/api/extractor?url=${encodeURIComponent(iframeUrl)}`
+                        `${EXTRACTOR_API_URL}?url=${encodeURIComponent(iframeUrl)}`
                     );
                     // extractorRes.data.sources is an array, use the first result
                     const extracted = extractorRes.data.sources && extractorRes.data.sources[0];
@@ -133,6 +128,11 @@ const scrapeWatch = async (id, req = null) => {
                     results.sources.push({
                         src: iframeUrl,
                         format: 'iframe'
+                    });
+                    // Add a browser-side log for debugging
+                    results.sources.push({
+                        src: `javascript:console.log("Extractor failed: ${e.message.replace(/"/g, '\\"')}")`,
+                        format: 'log'
                     });
                 }
             }
