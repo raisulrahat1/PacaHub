@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { extractPhpPlayer } = require('./php-extractor'); // Add this at the top if you want to use it directly
 
 const BASE_URL = 'https://hentai.tv';
 
@@ -91,33 +92,54 @@ const scrapeWatch = async (id) => {
                 sources: []
             };
 
+            // --- Updated iframe extraction and processing ---
             const videoIframe = $('.aspect-video iframe');
             if (videoIframe.length) {
-                results.sources.push({
-                    src: videoIframe.attr('src'),
-                    format: 'iframe'
-                });
+                const iframeUrl = videoIframe.attr('src');
+                // Call your own extractor endpoint
+                try {
+                    const extractorRes = await axios.get(
+                        `http://localhost:3000/api/extractor?url=${encodeURIComponent(iframeUrl)}`
+                    );
+                    // extractorRes.data.sources is an array, use the first result
+                    const extracted = extractorRes.data.sources && extractorRes.data.sources[0];
+                    if (extracted) {
+                        if (extracted.video) {
+                            results.sources.push({
+                                src: extracted.video,
+                                format: 'mp4'
+                            });
+                        }
+                        if (extracted.srt) {
+                            results.sources.push({
+                                src: extracted.srt,
+                                format: 'srt'
+                            });
+                        }
+                        // Optionally, keep the iframe as a fallback
+                        results.sources.push({
+                            src: iframeUrl,
+                            format: 'iframe'
+                        });
+                    }
+                } catch (e) {
+                    // Fallback: just push the iframe if extractor fails
+                    results.sources.push({
+                        src: iframeUrl,
+                        format: 'iframe'
+                    });
+                }
             }
+
             const episodeId = id.includes('-episode') ? id.replace(/-episode/, '') : `${id}-1`;
             const mp4Src = `https://r2.1hanime.com/${episodeId}.mp4`;
+
             results.sources.push({
                 src: mp4Src,
                 format: 'mp4'
             });
 
-            // Dynamically check if the -sub version exists before adding
-            const mp4SubSrc = `https://r2.1hanime.com/${episodeId}-sub.mp4`;
-            try {
-                const headRes = await axios.head(mp4SubSrc);
-                if (headRes.status === 200) {
-                    results.sources.push({
-                        src: mp4SubSrc,
-                        format: 'mp4'
-                    });
-                }
-            } catch (e) {
-                // -sub version not available, do nothing
-            }
+            // Removed -sub.mp4 logic
 
             if (!id.includes('-episode')) {
                 results.sources.push({
