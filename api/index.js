@@ -1,13 +1,9 @@
-require('dotenv').config();
 const express = require('express');
-const cheerio = require('cheerio');
+const apiRoutes = require('../src/routes/api');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 app.use(express.json());
-
-const apiRoutes = require('../src/routes/api');
 
 app.use('/api', apiRoutes);
 
@@ -25,8 +21,6 @@ app.get('/docs/genre', (req, res) => {
     res.json(docs);
 });
 
-
-
 app.use((req, res) => {
     res.status(404).json({
         status: 'error',
@@ -34,8 +28,5 @@ app.use((req, res) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
-
-module.exports = app; 
+// Export the app as a handler for Vercel
+module.exports = app;

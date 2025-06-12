@@ -30,7 +30,8 @@
                     "/api/hen/hentaitv/trending",
                     "/api/hen/hentaitv/watch/:id",
                     "/api/hen/hentaitv/info/:id",
-                    "/api/hen/hentaitv/genre/:genre (visit docs/genre for more info)"
+                    "/api/hen/hentaitv/genre/:genre (visit docs/genre for more info)",
+                    "/api/hen/hentaitv/brand/:brand?page=1"
                 ]
             },
             {
@@ -42,7 +43,7 @@
                 ]
             }
         ]
-        },
+    },
     "anime": {
         "provider": [
             {

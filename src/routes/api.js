@@ -5,6 +5,7 @@ const hentaicity = require('../providers/hentai/hentaicity');
 const mangakakalot = require('../providers/manga/mangakakalot/controler/mangaKakalotController');
 const javgg = require('../providers/jav/javgg/javggscraper');
 const javggvidlink = require('../providers/jav/javgg/javggvidlink');
+const extractor = require('../providers/hentai/extractor');
 
 // Helper function to handle responses
 const handleResponse = (res, promise) => {
@@ -21,6 +22,9 @@ router.get('/hen/hentaitv/genre/:genre/:page?', (req, res) => handleResponse(res
 router.get('/hen/hentaitv/recent', (req, res) => handleResponse(res, hentaitv.scrapeRecent()));
 router.get('/hen/hentaitv/trending', (req, res) => handleResponse(res, hentaitv.scrapeTrending()));
 router.get('/hen/hentaitv/random', (req, res) => handleResponse(res, hentaitv.scrapeRandom()));
+router.get('/hen/hentaitv/brand/:brand', (req, res) =>
+    handleResponse(res, hentaitv.scrapeBrand(req.params.brand, req.query.page || 1))
+);
 
 // HentaiCity endpoints
 router.get('/hen/hentaicity/recent', (req, res) => handleResponse(res, hentaicity.scrapeRecent()));
@@ -48,5 +52,7 @@ router.get('/jav/javgg/servers/:id', (req, res) => handleResponse(res, javgg.scr
 router.get('/jav/javgg/watch/:id', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.query.server)));
 router.get('/jav/javgg/genre/:genre/:page?', (req, res) => handleResponse(res, javgg.scrapeJavGenre(req.params.genre, req.params.page || 1)));
 
+// Extractor endpoint
+router.use('/extractor', extractor);
 
-module.exports = router; 
+module.exports = router;
