@@ -22,8 +22,8 @@ router.get('/hen/hentaitv/genre/:genre/:page?', (req, res) => handleResponse(res
 router.get('/hen/hentaitv/recent', (req, res) => handleResponse(res, hentaitv.scrapeRecent()));
 router.get('/hen/hentaitv/trending', (req, res) => handleResponse(res, hentaitv.scrapeTrending()));
 router.get('/hen/hentaitv/random', (req, res) => handleResponse(res, hentaitv.scrapeRandom()));
-router.get('/hen/hentaitv/brand/:brand/:page?', (req, res) => 
-    handleResponse(res, hentaitv.scrapeBrand(req.params.brand, req.params.page || 1))
+router.get('/hen/hentaitv/brand/:brand', (req, res) =>
+    handleResponse(res, hentaitv.scrapeBrand(req.params.brand, req.query.page || 1))
 );
 
 // HentaiCity endpoints
