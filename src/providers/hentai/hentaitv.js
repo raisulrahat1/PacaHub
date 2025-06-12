@@ -458,7 +458,72 @@ const scrapeRandom = async () => {
     }
 };
 
+const scrapeBrand = async (brand, page = 1) => {
+    return getCachedData(`brand-${brand}-page-${page}`, async () => {
+        try {
+            const pageNum = parseInt(page, 10) || 1;
+            const url = `${BASE_URL}/brand/${brand}/page/${pageNum}/`;
+            const { data } = await axios.get(url);
+            const $ = cheerio.load(data);
+            const results = [];
+
+            $('.crsl-slde').each((i, el) => {
+                const title = $(el).find('a').text().trim();
+                const id = $(el).find('a').attr('href').split('/hentai/').pop().split('/').shift();
+                const image = $(el).find('img').attr('src');
+                const views = $(el).find('.opacity-50').text().trim().replace(/,/g, '');
+
+                results.push({
+                    title,
+                    id,
+                    image,
+                    views: parseInt(views, 10),
+                });
+            });
+
+            // Pagination logic (optional, similar to scrapeGenre)
+            const hasPagination = $('.flex[data-nav]').length > 0;
+            let currentPage = pageNum;
+            let totalPages = 1;
+
+            if (hasPagination) {
+                $('.flex[data-nav] a').each((i, el) => {
+                    const href = $(el).attr('href');
+                    if (href) {
+                        const pageMatch = href.match(/\/page\/(\d+)/);
+                        if (pageMatch && pageMatch[1]) {
+                            const pageNumber = parseInt(pageMatch[1], 10);
+                            if (pageNumber > totalPages) {
+                                totalPages = pageNumber;
+                            }
+                        }
+                    }
+                });
+                $('.flex[data-nav] .btn-primary, .flex[data-nav] .current').each((i, el) => {
+                    const text = $(el).text().trim();
+                    if (/^\d+$/.test(text)) {
+                        currentPage = parseInt(text, 10);
+                    }
+                });
+            }
+
+            const hasNextPage = currentPage < totalPages;
+
+            return {
+                provider: 'hentaitv',
+                type: 'brand',
+                brand,
+                results,
+                totalPages,
+                currentPage,
+                hasNextPage
+            };
+        } catch (error) {
+            throw new Error(`Failed to scrape HentaiTV brand: ${error.message}`);
+        }
+    });
+};
         
 
 
-module.exports = { scrapeRecent, scrapeTrending, scrapeInfo, scrapeWatch, scrapeSearch, scrapeGenre, scrapeRandom };
+module.exports = { scrapeRecent, scrapeTrending, scrapeInfo, scrapeWatch, scrapeSearch, scrapeGenre, scrapeRandom, scrapeBrand };
