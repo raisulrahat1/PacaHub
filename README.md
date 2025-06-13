@@ -102,7 +102,7 @@ The API will be available at `http://localhost:3000`.
 | `/api/hen/hentaitv/watch/:id` | Get video sources | `id`: Video ID |
 | `/api/hen/hentaitv/info/:id` | Get video details | `id`: Video ID |
 | `/api/hen/hentaitv/genre/:genre/:page?` | Get videos by genre | `genre`: Genre name<br>`page`: Page number (optional) |
-| `/api/hen/hentaitv/brand/:brand?page=1` | Get Studio | '?page=': Page Number (optional) |
+| `/api/hen/hentaitv/brand/:brand?page=1` | Get Studio | `?page=`: Page Number (optional) |
 
 ### 🔞 HentaiCity
 
