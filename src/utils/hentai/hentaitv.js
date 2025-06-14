@@ -102,12 +102,12 @@ async function scrapeHentaiTV(url) {
                 results.sources.push({ src: extracted.srt, format: 'srt' });
             }
 
-            results.sources.push({ src: playerFullUrl, format: 'player-fallback' });
+            results.sources.push({ src: playerFullUrl, format: 'iframe' });
         } catch (e) {
             console.error(`Failed to fetch player page (${playerFullUrl}): ${e.message}`);
             results.sources.push({
                 src: playerFullUrl,
-                format: 'player-fallback',
+                format: 'iframe',
             });
         }
 
