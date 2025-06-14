@@ -1,10 +1,8 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { extractPhpPlayer } = require('./php-extractor'); // Add this at the top if you want to use it directly
 
 const BASE_URL = 'https://hentai.tv';
-const EXTRACTOR_API_URL = process.env.EXTRACTOR_API_URL || 'http://localhost:3000/api/extractor';
-
+const { scrapeHentaiTV } = require('../../utils/hentai/hentaitv');
 // Simple in-memory cache
 const cache = {};
 
@@ -93,70 +91,23 @@ const scrapeWatch = async (id) => {
                 sources: []
             };
 
-            // --- Updated iframe extraction and processing ---
             const videoIframe = $('.aspect-video iframe');
             if (videoIframe.length) {
                 const iframeUrl = videoIframe.attr('src');
-                // Call your own extractor endpoint
                 try {
-                    const extractorRes = await axios.get(
-                        `${EXTRACTOR_API_URL}?url=${encodeURIComponent(iframeUrl)}`
-                    );
-                    // extractorRes.data.sources is an array, use the first result
-                    const extracted = extractorRes.data.sources && extractorRes.data.sources[0];
-                    if (extracted) {
-                        if (extracted.video) {
-                            results.sources.push({
-                                src: extracted.video,
-                                format: 'mp4'
-                            });
-                        }
-                        if (extracted.srt) {
-                            results.sources.push({
-                                src: extracted.srt,
-                                format: 'srt'
-                            });
-                        }
-                        // Optionally, keep the iframe as a fallback
-                        results.sources.push({
-                            src: iframeUrl,
-                            format: 'iframe'
-                        });
+                    const extractorRes = await scrapeHentaiTV(iframeUrl);
+                    const extracted = extractorRes.results;
+                    if (extracted && extracted.sources && extracted.sources.length > 0) {
+                        results.sources.push(...extracted.sources);
                     }
                 } catch (e) {
-                    // Fallback: just push the iframe if extractor fails
-                    results.sources.push({
-                        src: iframeUrl,
-                        format: 'iframe'
-                    });
-                    // Add a browser-side log for debugging
-                    results.sources.push({
-                        src: `javascript:console.log("Extractor failed: ${e.message.replace(/"/g, '\\"')}")`,
-                        format: 'log'
-                    });
+                    console.log('Extractor failed:', e);
                 }
-            }
-
-            const episodeId = id.includes('-episode') ? id.replace(/-episode/, '') : `${id}-1`;
-            const mp4Src = `https://r2.1hanime.com/${episodeId}.mp4`;
-
-            results.sources.push({
-                src: mp4Src,
-                format: 'mp4'
-            });
-
-            // Removed -sub.mp4 logic
-
-            if (!id.includes('-episode')) {
-                results.sources.push({
-                    src: `https://r2.1hanime.com/${id}.mp4`,
-                    format: 'movie'
-                });
             }
 
             return { results: results };
         } catch (error) {
-            throw new Error(`Failed to scrape HentaiTV: ${error.message}`);
+            throw new Error(`Failed to scrape HentaiTV watch: ${error.message}`);
         }
     });
 };
