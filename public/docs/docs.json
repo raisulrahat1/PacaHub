@@ -68,7 +68,7 @@
                     "/api/jav/javgg/info/:id",
                     "/api/jav/javgg/servers/:id",
                     "/api/jav/javgg/watch/:id",
-                    "/api/jav/javgg/watch/:id/:server",
+                    "/api/jav/javgg/watch/:id/:serverId",
                     "/api/jav/javgg/random/:page",
                     "/api/jav/javgg/genre/:genre (visit docs/genre for more info)"
                 ]

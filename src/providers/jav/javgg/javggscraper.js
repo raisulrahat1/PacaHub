@@ -139,12 +139,14 @@ const scrapeJavDetails = async (javId) => {
         const $ = cheerio.load(data);
         const image = $('#coverimage .cover').attr('src');
         const images = [];
-        $('#cover .sbox a img').each((_, el) => {
-            const imgSrc = $(el).attr('src');
-            if (imgSrc && imgSrc.includes('pics.dmm')) {
-                images.push(imgSrc);
+        $('#cover a img').each((_, img) => {
+            const imgSrc = $(img).attr('src');
+            const link = $(img).closest('a').attr('href');
+            if (imgSrc && link) {
+                images.push({ preview: imgSrc, full: link });
             }
         });
+        
         const title = $('h1').text().trim();
         const date = $('.date').text().trim();
         const duration = $('.runtime').text().trim();
@@ -168,8 +170,9 @@ const scrapeJavDetails = async (javId) => {
         $('.boxye2:contains("Label") .sgeneros3#Cast a').each((_, el) => {
             label.push($(el).text().trim());
         });
+
         const downloads = [];
-        $('#downloads .dlboxx a').each((_, el) => {
+        $('.dlboxx a.btndll').each((_, el) => {
             const link = $(el).attr('href');
             const text = $(el).text().trim();
             if (link && text) {
@@ -180,7 +183,6 @@ const scrapeJavDetails = async (javId) => {
         const result = {
             title,
             image,
-            images,
             date,
             duration,
             cast,
@@ -189,6 +191,7 @@ const scrapeJavDetails = async (javId) => {
             maker,
             label,
             downloads,
+            images,
         };
 
         return result;
