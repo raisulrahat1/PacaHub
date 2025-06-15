@@ -40,7 +40,10 @@
                 "endpoint": [
                     "/api/hen/city/recent",
                     "/api/hen/city/popular/:page",
-                    "/api/hen/city/top/:page"
+                    "/api/hen/city/top/:page",
+                    "/api/hen/city/watch/:id",
+                    "/api/hen/city/info/:id"
+
 
                 ]
             }
