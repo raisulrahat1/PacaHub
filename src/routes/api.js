@@ -15,20 +15,23 @@ const handleResponse = (res, promise) => {
 };
 
 // HentaiTV endpoints
-router.get('/hen/hentaitv/watch/:id', (req, res) => handleResponse(res, hentaitv.scrapeWatch(req.params.id)));
-router.get('/hen/hentaitv/info/:id', (req, res) => handleResponse(res, hentaitv.scrapeInfo(req.params.id)));
-router.get('/hen/hentaitv/search/:query/:page?', (req, res) => handleResponse(res, hentaitv.scrapeSearch(req.params.query, req.params.page || 1)));
-router.get('/hen/hentaitv/genre/:genre/:page?', (req, res) => handleResponse(res, hentaitv.scrapeGenre(req.params.genre, req.params.page || 1)));
-router.get('/hen/hentaitv/recent', (req, res) => handleResponse(res, hentaitv.scrapeRecent()));
-router.get('/hen/hentaitv/trending', (req, res) => handleResponse(res, hentaitv.scrapeTrending()));
-router.get('/hen/hentaitv/random', (req, res) => handleResponse(res, hentaitv.scrapeRandom()));
-router.get('/hen/hentaitv/brand/:brand', (req, res) =>
+router.get('/hen/tv/watch/:id', (req, res) => handleResponse(res, hentaitv.scrapeWatch(req.params.id)));
+router.get('/hen/tv/info/:id', (req, res) => handleResponse(res, hentaitv.scrapeInfo(req.params.id)));
+router.get('/hen/tv/search/:query/:page?', (req, res) => handleResponse(res, hentaitv.scrapeSearch(req.params.query, req.params.page || 1)));
+router.get('/hen/tv/genre/:genre/:page?', (req, res) => handleResponse(res, hentaitv.scrapeGenre(req.params.genre, req.params.page || 1)));
+router.get('/hen/tv/recent', (req, res) => handleResponse(res, hentaitv.scrapeRecent()));
+router.get('/hen/tv/trending', (req, res) => handleResponse(res, hentaitv.scrapeTrending()));
+router.get('/hen/tv/random', (req, res) => handleResponse(res, hentaitv.scrapeRandom()));
+router.get('/hen/tv/brand/:brand', (req, res) =>
     handleResponse(res, hentaitv.scrapeBrand(req.params.brand, req.query.page || 1))
 );
 
 // HentaiCity endpoints
-router.get('/hen/hentaicity/recent', (req, res) => handleResponse(res, hentaicity.scrapeRecent()));
-router.get('/hen/hentaicity/popular', (req, res) => handleResponse(res, hentaicity.scrapePopular()));
+router.get('/hen/city/info/:id', (req, res) => handleResponse(res, hentaicity.scrapeInfo(req.params.id)));
+router.get('/hen/city/watch/:id', (req, res) => handleResponse(res, hentaicity.scrapeWatch(req.params.id)));
+router.get('/hen/city/recent', (req, res) => handleResponse(res, hentaicity.scrapeRecent()));
+router.get('/hen/city/popular/:page?', (req, res) => {const page = req.params.page ? parseInt(req.params.page, 10) : 1; handleResponse(res, hentaicity.scrapePopular(page));});
+router.get('/hen/city/top/:page?', (req, res) => {const page = req.params.page ? parseInt(req.params.page, 10) : 1; handleResponse(res, hentaicity.scrapeTop(page));});
 
 // MangaKakalot endpoints
 router.get("/manga/kakalot/read/:mangaId?/:chapterId?", mangakakalot.getMangaChapterImages);
@@ -51,8 +54,18 @@ router.get('/jav/javgg/info/:id', (req, res) => handleResponse(res, javgg.scrape
 router.get('/jav/javgg/servers/:id', (req, res) => handleResponse(res, javgg.scrapeJavServers(req.params.id)));
 router.get('/jav/javgg/watch/:id', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.query.server)));
 router.get('/jav/javgg/watch/:id/:server', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.params.server)));
-
 router.get('/jav/javgg/genre/:genre/:page?', (req, res) => handleResponse(res, javgg.scrapeJavGenre(req.params.genre, req.params.page || 1)));
+
+
+
+
+
+
+
+
+
+
+
 
 
 

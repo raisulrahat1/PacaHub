@@ -24,22 +24,24 @@
                 "name": "HentaiTV",
                 "url": "https://hentai.tv",
                 "endpoint": [
-                    "/api/hen/hentaitv/search/:query/:page",
-                    "/api/hen/hentaitv/random",
-                    "/api/hen/hentaitv/recent",
-                    "/api/hen/hentaitv/trending",
-                    "/api/hen/hentaitv/watch/:id",
-                    "/api/hen/hentaitv/info/:id",
-                    "/api/hen/hentaitv/genre/:genre (visit docs/genre for more info)",
-                    "/api/hen/hentaitv/brand/:brand?page=1"
+                    "/api/hen/tv/search/:query/:page",
+                    "/api/hen/tv/random",
+                    "/api/hen/tv/recent",
+                    "/api/hen/tv/trending",
+                    "/api/hen/tv/watch/:id",
+                    "/api/hen/tv/info/:id",
+                    "/api/hen/tv/genre/:genre (visit docs/genre for more info)",
+                    "/api/hen/tv/brand/:brand?page=1"
                 ]
             },
             {
                 "name": "HentaiCity",
                 "url": "https://hentaicity.com",
                 "endpoint": [
-                    "/api/hen/hentaicity/recent",
-                    "/api/hen/hentaicity/popular"
+                    "/api/hen/city/recent",
+                    "/api/hen/city/popular/:page",
+                    "/api/hen/city/top/:page"
+
                 ]
             }
         ]
