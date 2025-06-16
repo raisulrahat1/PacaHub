@@ -5,6 +5,8 @@ const hentaicity = require('../providers/hentai/hentaicity');
 const mangakakalot = require('../providers/manga/mangakakalot/controler/mangaKakalotController');
 const javgg = require('../providers/jav/javgg/javggscraper');
 const javggvidlink = require('../providers/jav/javgg/javggvidlink');
+const hentaimama = require('../providers/hentai/hentaimama');
+const { hentaimamaSearch } = require('../providers/hentai/hentaimama');
 
 
 // Helper function to handle responses
@@ -56,17 +58,42 @@ router.get('/jav/javgg/watch/:id', (req, res) => handleResponse(res, javggvidlin
 router.get('/jav/javgg/watch/:id/:server', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.params.server)));
 router.get('/jav/javgg/genre/:genre/:page?', (req, res) => handleResponse(res, javgg.scrapeJavGenre(req.params.genre, req.params.page || 1)));
 
-
-
-
-
-
-
-
-
-
-
-
-
+// HentaiMama endpoints
+router.get('/hen/mama/home', (req, res) => handleResponse(res, hentaimama.scrapeHome()));
+router.get('/hen/mama/info/:id', (req, res) => handleResponse(res, hentaimama.scrapeInfo(req.params.id)));
+router.get('/hen/mama/episode/:id', (req, res) => handleResponse(res, hentaimama.scrapeEpisode(req.params.id)));
+router.get('/hen/mama/series/:page?', (req, res) =>
+    handleResponse(
+        res,
+        hentaimama.scrapeSeries(
+            req.params.page ? parseInt(req.params.page, 10) : 1,
+            req.query.filter
+        )
+    )
+);
+// Add this route for genre
+router.get('/hen/mama/genre-list', (req, res) => handleResponse(res, hentaimama.scrapeGenreList()));
+router.get('/hen/mama/genre/:genre/page/:page', (req, res) =>
+    handleResponse(
+        res,
+        hentaimama.scrapeGenrePage(req.params.genre, parseInt(req.params.page, 10) || 1)
+    )
+);
+router.get('/hen/mama/genre/:genre', (req, res) =>
+    handleResponse(
+        res,
+        hentaimama.scrapeGenrePage(
+            req.params.genre,
+            parseInt(req.query.page, 10) || 1
+        )
+    )
+);
+router.get('/hen/mama/search', async (req, res) => {
+    const q = req.query.q || '';
+    const page = parseInt(req.query.page || '1', 10);
+    if (!q) return res.status(400).json({ error: 'Missing query parameter ?q=' });
+    const results = await hentaimamaSearch(q, page);
+    res.json(results);
+});
 
 module.exports = router;

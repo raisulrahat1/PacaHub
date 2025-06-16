@@ -3,17 +3,17 @@
         "provider": [
             {
                 "name": "MangaKakalot",
-                "url": "https://www.mangakakalot.gg/",
+                "url": "https://mangakakalot.com",
                 "endpoint": [
-                    "/api/manga/kakalot/search/:query/:page",
-                    "/api/manga/kakalot/latest/:page",
-                    "/api/manga/kakalot/popular/:page",
-                    "/api/manga/kakalot/newest/:page",
-                    "/api/manga/kakalot/completed/:page",
-                    "/api/manga/kakalot/popular-now",
-                    "/api/manga/kakalot/home",
+                    "/api/manga/kakalot/read/:mangaId?/:chapterId?",
                     "/api/manga/kakalot/details/:id",
-                    "/api/manga/kakalot/read/:mangaId?/:chapterId?"
+                    "/api/manga/kakalot/search/:query?/:page?",
+                    "/api/manga/kakalot/latest/:page?",
+                    "/api/manga/kakalot/popular/:page?",
+                    "/api/manga/kakalot/newest/:page?",
+                    "/api/manga/kakalot/completed/:page?",
+                    "/api/manga/kakalot/popular-now",
+                    "/api/manga/kakalot/home"
                 ]
             }
         ]
@@ -22,29 +22,41 @@
         "provider": [
             {
                 "name": "HentaiTV",
-                "url": "https://hentai.tv",
+                "url": "https://hentaitv.com",
                 "endpoint": [
-                    "/api/hen/tv/search/:query/:page",
-                    "/api/hen/tv/random",
-                    "/api/hen/tv/recent",
-                    "/api/hen/tv/trending",
                     "/api/hen/tv/watch/:id",
                     "/api/hen/tv/info/:id",
-                    "/api/hen/tv/genre/:genre (visit docs/genre for more info)",
-                    "/api/hen/tv/brand/:brand?page=1"
+                    "/api/hen/tv/search/:query/:page?",
+                    "/api/hen/tv/genre/:genre/:page?",
+                    "/api/hen/tv/recent",
+                    "/api/hen/tv/trending",
+                    "/api/hen/tv/random",
+                    "/api/hen/tv/brand/:brand"
                 ]
             },
             {
                 "name": "HentaiCity",
                 "url": "https://hentaicity.com",
                 "endpoint": [
-                    "/api/hen/city/recent",
-                    "/api/hen/city/popular/:page",
-                    "/api/hen/city/top/:page",
+                    "/api/hen/city/info/:id",
                     "/api/hen/city/watch/:id",
-                    "/api/hen/city/info/:id"
-
-
+                    "/api/hen/city/recent",
+                    "/api/hen/city/popular/:page?",
+                    "/api/hen/city/top/:page?"
+                ]
+            },
+            {
+                "name": "HentaiMama",
+                "url": "https://hentaimama.io",
+                "endpoint": [
+                    "/api/hen/mama/home",
+                    "/api/hen/mama/info/:id",
+                    "/api/hen/mama/episode/:id",
+                    "/api/hen/mama/series/:page?",
+                    "/api/hen/mama/genre-list",
+                    "/api/hen/mama/genre/:genre/page/:page",
+                    "/api/hen/mama/genre/:genre",
+                    "/api/hen/mama/search?q={query}&page={page}"
                 ]
             }
         ]
@@ -66,16 +78,16 @@
                 "name": "JavGG",
                 "url": "https://javgg.net",
                 "endpoint": [
-                    "/api/jav/javgg/recent/:page",
-                    "/api/jav/javgg/featured/:page",
-                    "/api/jav/javgg/trending/:page",
-                    "/api/jav/javgg/search/:query/:page",
+                    "/api/jav/javgg/recent/:page?",
+                    "/api/jav/javgg/featured/:page?",
+                    "/api/jav/javgg/trending/:page?",
+                    "/api/jav/javgg/random/:page?",
+                    "/api/jav/javgg/search/:query/:page?",
                     "/api/jav/javgg/info/:id",
                     "/api/jav/javgg/servers/:id",
                     "/api/jav/javgg/watch/:id",
-                    "/api/jav/javgg/watch/:id/:serverId",
-                    "/api/jav/javgg/random/:page",
-                    "/api/jav/javgg/genre/:genre (visit docs/genre for more info)"
+                    "/api/jav/javgg/watch/:id/:server",
+                    "/api/jav/javgg/genre/:genre/:page?"
                 ]
             }
         ]
