@@ -22,7 +22,7 @@
         "provider": [
             {
                 "name": "HentaiTV",
-                "url": "https://hentaitv.com",
+                "url": "https://hentai.tv",
                 "endpoint": [
                     "/api/hen/tv/watch/:id",
                     "/api/hen/tv/info/:id",
