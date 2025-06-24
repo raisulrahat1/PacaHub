@@ -51,7 +51,14 @@ const scrapeTrending = async (page = 1) => {
     }
 
     try {
-        const { data } = await axios.get(`${BASE_URL}/trending/?sort=today&page=${page}`);
+        // Dynamic paging: support both first and later pages
+        let url;
+        if (page === 1) {
+            url = `${BASE_URL}/trending/?sort=today`;
+        } else {
+            url = `${BASE_URL}/trending/page/${page}/?sort=today`;
+        }
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const results = [];
 
@@ -65,8 +72,12 @@ const scrapeTrending = async (page = 1) => {
         });
 
         const paginationText = $('.pagination span').first().text();
-        const totalPages = parseInt(paginationText.split('of')[1].trim(), 10);
-        const currentPage = parseInt(paginationText.split(' ')[1], 10);
+        let totalPages = 1;
+        let currentPage = page;
+        if (paginationText && paginationText.includes('of')) {
+            totalPages = parseInt(paginationText.split('of')[1].trim(), 10);
+            currentPage = parseInt(paginationText.split(' ')[1], 10);
+        }
 
         const result = {
             provider: 'javgg',
