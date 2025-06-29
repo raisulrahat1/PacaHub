@@ -22,6 +22,7 @@
   - [MangaKakalot](#-mangakakalot)
   - [HentaiTV](#-hentaitv)
   - [HentaiCity](#-hentaicity)
+  - [JavGG](#-javgg) <!-- Added -->
 - [Supported Providers](#-supported-providers)
 - [Examples](#-examples)
 - [Contributing](#-contributing)
@@ -102,7 +103,7 @@ The API will be available at `http://localhost:3000`.
 | `/api/hen/hentaitv/watch/:id` | Get video sources | `id`: Video ID |
 | `/api/hen/hentaitv/info/:id` | Get video details | `id`: Video ID |
 | `/api/hen/hentaitv/genre/:genre/:page?` | Get videos by genre | `genre`: Genre name<br>`page`: Page number (optional) |
-| '`/api/hen/hentaitv/brand/:brand?page=1` | Get Studio | '?page=': Page Number (optional) |
+| `/api/hen/hentaitv/brand/:brand?page=1` | Get Studio | '?page=': Page Number (optional) |
 
 ### 🔞 HentaiCity
 
@@ -110,6 +111,29 @@ The API will be available at `http://localhost:3000`.
 |----------|-------------|------------|
 | `/api/hen/hentaicity/recent` | Get recently added videos | None |
 | `/api/hen/hentaicity/popular` | Get popular videos | None |
+
+### 🎬 JavGG
+
+| Endpoint | Description | Parameters |
+|----------|-------------|------------|
+| `/api/jav/javgg/recent/:page?` | Get recent JAV movies | `page`: Page number (optional) |
+| `/api/jav/javgg/featured/:page?` | Get featured JAV movies | `page`: Page number (optional) |
+| `/api/jav/javgg/trending/:page?` | Get trending JAV movies | `page`: Page number (optional) |
+| `/api/jav/javgg/random/:page?` | Get random JAV movies | `page`: Page number (optional) |
+| `/api/jav/javgg/search/:query/:page?` | Search JAV movies | `query`: Search term<br>`page`: Page number (optional) |
+| `/api/jav/javgg/info/:id` | Get JAV movie details | `id`: Movie ID |
+| `/api/jav/javgg/servers/:id` | Get available servers for a movie | `id`: Movie ID |
+| `/api/jav/javgg/watch/:id` | Watch a movie | `id`: Movie ID |
+| `/api/jav/javgg/watch/:id/:server` | Watch a movie on a specific server | `id`: Movie ID<br>`server`: Server name |
+| `/api/jav/javgg/genre/:genre/:page?` | Get movies by genre | `genre`: Genre name<br>`page`: Page number (optional) |
+| `/api/jav/javgg/genre-list` | Get all genres | None |
+| `/api/jav/javgg/star-list` | Get all actresses | None |
+| `/api/jav/javgg/top-actress` | Get top actresses | None |
+| `/api/jav/javgg/star/:id/:page?` | Get movies by actress | `id`: Actress ID<br>`page`: Page number (optional) |
+| `/api/jav/javgg/tag-list` | Get all tags | None |
+| `/api/jav/javgg/tag/:tag/:page?` | Get movies by tag | `tag`: Tag name<br>`page`: Page number (optional) |
+| `/api/jav/javgg/maker-list` | Get all makers | None |
+| `/api/jav/javgg/maker/:id/:page?` | Get movies by maker | `id`: Maker ID<br>`page`: Page number (optional) |
 
 For more detailed information and examples, visit the `/docs` endpoint in the API.
 
@@ -126,6 +150,7 @@ PacaHub currently integrates with the following content sources:
 | 📖 **MangaKakalot** | ✅ Running | Manga | Search, Latest, Popular, Details, Read |
 | 🎥 **HentaiTV** | ✅ Running | Adult Videos | Search, Random, Recent, Trending, Watch, Info, Genre |
 | 🔞 **HentaiCity** | ✅ Running | Adult Videos | Recent, Popular |
+| 🎬 **JavGG** | ✅ Running | JAV | Recent, Featured, Trending, Random, Search, Info, Genre, Actress, Tag, Maker | <!-- Added -->
 
 </div>
 
