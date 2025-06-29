@@ -79,6 +79,17 @@ router.get('/jav/javgg/tag/:tag/:page?', (req, res) =>
         javgg.scrapeJavTag(req.params.tag, req.params.page ? parseInt(req.params.page, 10) : 1)
     )
 );
+// Add this route for JAVGG maker list
+router.get('/jav/javgg/maker-list', (req, res) =>
+    handleResponse(res, javgg.scrapeJavMakers())
+);
+// Add this route for JAVGG maker movies by maker id and page
+router.get('/jav/javgg/maker/:id/:page?', (req, res) =>
+    handleResponse(
+        res,
+        javgg.scrapeJavMaker(req.params.id, req.params.page ? parseInt(req.params.page, 10) : 1)
+    )
+);
 
 // HentaiMama endpoints
 router.get('/hen/mama/home', (req, res) => handleResponse(res, hentaimama.scrapeHome()));

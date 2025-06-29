@@ -568,6 +568,75 @@ const scrapeJavTag = async (tag, page = 1) => {
     }
 };
 
+const scrapeJavMakers = async () => {
+    const url = `${BASE_URL}/maker/`;
+    try {
+        const { data } = await axios.get(url);
+        const $ = cheerio.load(data);
+        const makers = [];
+
+        // Each .category-list-view ul li a contains a maker
+        $('.category-list-view ul li a').each((_, el) => {
+            const nameWithCount = $(el).text().trim();
+            const match = nameWithCount.match(/^(.+?)\s*\((\d+)\)$/);
+            let name = nameWithCount, count = null;
+            if (match) {
+                name = match[1].trim();
+                count = parseInt(match[2], 10);
+            }
+            const href = $(el).attr('href');
+            // Extract maker id from URL: /maker/{id}/
+            const idMatch = href && href.match(/\/maker\/([^/]+)\//);
+            const id = idMatch ? idMatch[1] : null;
+            makers.push({ name, count });
+        });
+
+        return makers;
+    } catch (error) {
+        throw new Error(`Failed to scrape JAV makers: ${error.message}`);
+    }
+};
+
+const scrapeJavMaker = async (makerId, page = 1) => {
+    // makerId: the id from /maker/{id}/, page: page number (default 1)
+    const url = `${BASE_URL}/maker/${makerId}/page/${page}/`;
+    try {
+        const { data } = await axios.get(url);
+        const $ = cheerio.load(data);
+
+        // Get maker name from <h1>
+        const name = $('header h1').first().text().trim();
+
+        // Movies
+        const results = [];
+        $('.items .item').each((_, el) => {
+            const title = $(el).find('h3 a').text().trim();
+            const id = $(el).find('a[href^="https://javgg.net/jav/"]').attr('href')?.split('/').slice(-2, -1)[0];
+            const image = $(el).find('img').attr('src');
+            const date = $(el).find('.data span').text().trim();
+            results.push({ id, title, image, date });
+        });
+
+        // Pagination
+        const paginationText = $('.pagination span').first().text();
+        let totalPages = 1, currentPage = page;
+        if (paginationText && paginationText.includes('of')) {
+            totalPages = parseInt(paginationText.split('of')[1].trim(), 10);
+            currentPage = parseInt(paginationText.split(' ')[1], 10);
+        }
+
+        return {
+            makerId,
+            name,
+            currentPage,
+            totalPages,
+            results,
+        };
+    } catch (error) {
+        throw new Error(`Failed to scrape JAV maker page: ${error.message}`);
+    }
+};
+
 module.exports = { 
     scrapeFeatured,
     scrapeJavggFeatured,
@@ -585,4 +654,6 @@ module.exports = {
     scrapeJavStar,
     scrapeJavTags,
     scrapeJavTag,
+    scrapeJavMakers,
+    scrapeJavMaker,
 };

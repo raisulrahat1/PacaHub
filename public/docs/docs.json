@@ -87,7 +87,15 @@
                     "/api/jav/javgg/servers/:id",
                     "/api/jav/javgg/watch/:id",
                     "/api/jav/javgg/watch/:id/:server",
-                    "/api/jav/javgg/genre/:genre/:page?"
+                    "/api/jav/javgg/genre/:genre/:page?",
+                    "/api/jav/javgg/genre-list",
+                    "/api/jav/javgg/star-list",
+                    "/api/jav/javgg/top-actress",
+                    "/api/jav/javgg/star/:id/:page?",
+                    "/api/jav/javgg/tag-list",
+                    "/api/jav/javgg/tag/:tag/:page?",
+                    "/api/jav/javgg/maker-list",
+                    "/api/jav/javgg/maker/:id/:page?"
                 ]
             }
         ]
