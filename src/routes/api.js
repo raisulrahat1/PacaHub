@@ -57,6 +57,28 @@ router.get('/jav/javgg/servers/:id', (req, res) => handleResponse(res, javgg.scr
 router.get('/jav/javgg/watch/:id', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.query.server)));
 router.get('/jav/javgg/watch/:id/:server', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.params.server)));
 router.get('/jav/javgg/genre/:genre/:page?', (req, res) => handleResponse(res, javgg.scrapeJavGenre(req.params.genre, req.params.page || 1)));
+// Add this route for JAVGG genre list
+router.get('/jav/javgg/genre-list', (req, res) => handleResponse(res, javgg.scrapeJavGenres()));
+// Add this route for JAVGG star list
+router.get('/jav/javgg/star-list', (req, res) => handleResponse(res, javgg.scrapeJavStars()));
+// Add this route for JAVGG top actress list
+router.get('/jav/javgg/top-actress', (req, res) => handleResponse(res, javgg.scrapeJavTopActress()));
+// Add this route for JAVGG actress profile and movies
+router.get('/jav/javgg/star/:id/:page?', (req, res) =>
+    handleResponse(
+        res,
+        javgg.scrapeJavStar(req.params.id, req.params.page ? parseInt(req.params.page, 10) : 1)
+    )
+);
+// Add this route for JAVGG tag list (only tag names)
+router.get('/jav/javgg/tag-list', (req, res) => handleResponse(res, javgg.scrapeJavTags()));
+// Add this route for JAVGG tag movies by tag name and page
+router.get('/jav/javgg/tag/:tag/:page?', (req, res) =>
+    handleResponse(
+        res,
+        javgg.scrapeJavTag(req.params.tag, req.params.page ? parseInt(req.params.page, 10) : 1)
+    )
+);
 
 // HentaiMama endpoints
 router.get('/hen/mama/home', (req, res) => handleResponse(res, hentaimama.scrapeHome()));
