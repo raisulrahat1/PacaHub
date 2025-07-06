@@ -7,6 +7,7 @@ const javgg = require('../providers/jav/javgg/javggscraper');
 const javggvidlink = require('../providers/jav/javgg/javggvidlink');
 const hentaimama = require('../providers/hentai/hentaimama');
 const { hentaimamaSearch } = require('../providers/hentai/hentaimama');
+const javtsunami = require('../providers/jav/javtsunami/javtsunamiscraper'); // Add this near your other requires
 
 
 // Helper function to handle responses
@@ -127,6 +128,53 @@ router.get('/hen/mama/search', async (req, res) => {
     if (!q) return res.status(400).json({ error: 'Missing query parameter ?q=' });
     const results = await hentaimamaSearch(q, page);
     res.json(results);
+});
+
+// --- JAVTsunami endpoints ---
+
+// Featured section (use category 'featured' for this endpoint)
+router.get('/jav/tsunami/featured', (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const filter = req.query.filter || 'latest'; // filter: latest, most-viewed, longest, random
+    handleResponse(res, javtsunami.scrapeCategory('featured', page, filter));
+});
+
+// Category section
+router.get('/jav/tsunami/category/:category', (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const filter = req.query.filter || 'latest';
+    handleResponse(res, javtsunami.scrapeCategory(req.params.category, page, filter));
+});
+
+// Watch servers (DoodStream, etc.)
+router.get('/jav/tsunami/watch/:id', (req, res) => {
+    // Accepts /jav/tsunami/watch/:id where :id is the slug (with or without .html)
+    let id = req.params.id.replace(/\.html$/, '');
+    let videoPath = `/watch/${id}`;
+    handleResponse(res, javtsunami.scrapeWatch(videoPath));
+});
+
+// Add this route for JAVTsunami tag list
+router.get('/jav/tsunami/tag-list', (req, res) => {
+    handleResponse(res, javtsunami.scrapeTagList());
+});
+
+// Add this route for JAVTsunami tag movies (same as category, but for tags)
+router.get('/jav/tsunami/tag/:tag', (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const filter = req.query.filter || 'latest';
+    handleResponse(res, javtsunami.scrapeTag(req.params.tag, page, filter));
+});
+
+// Add this route for JAVTsunami search (same as category, but for search query)
+router.get('/jav/tsunami/search', (req, res) => {
+    const query = req.query.q || '';
+    const page = parseInt(req.query.page, 10) || 1;
+    if (!query) {
+        return res.status(400).json({ status: 'error', message: 'Missing query parameter ?q=' });
+    }
+    // Remove filter param for search
+    handleResponse(res, javtsunami.scrapeSearch(query, page));
 });
 
 module.exports = router;

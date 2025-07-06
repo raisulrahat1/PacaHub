@@ -97,6 +97,17 @@
                     "/api/jav/javgg/maker-list",
                     "/api/jav/javgg/maker/:id/:page?"
                 ]
+            },
+            {
+                "name": "JavTsunami",
+                "url": "https://javtsunami.com",
+                "endpoint": [
+                    "/api/jav/tsunami/featured?page={page}&filter={filter}",
+                    "/api/jav/tsunami/category/:category?page={page}&filter={filter}",
+                    "/api/jav/tsunami/watch/:id",
+                    "/api/jav/tsunami/tag-list",
+                    "/api/jav/tsunami/tag/:tag?page={page}&filter={filter}"
+                ]
             }
         ]
     }
