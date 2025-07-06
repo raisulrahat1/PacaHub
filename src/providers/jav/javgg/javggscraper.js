@@ -1,130 +1,51 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-// --- Playwright for advanced scraping ---
-const { chromium } = require('playwright');
-
 const BASE_URL = 'http://javgg.net';
 const cache = new Map(); 
 
-// --- Helper: axios with browser-like headers and referer ---
-const browserHeaders = {
-    'Referer': BASE_URL,
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Connection': 'keep-alive',
-    'DNT': '1',
-    'Upgrade-Insecure-Requests': '1',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'same-origin',
-    'Sec-Fetch-User': '?1',
-    'Cache-Control': 'max-age=0',
-    'Pragma': 'no-cache',
-    'TE': 'Trailers',
-    'Cookie': '', // Optionally set cookies if needed
-};
 
-const axiosWithHeaders = (url, referer = BASE_URL) => {
-    return axios.get(url, {
-        headers: { ...browserHeaders, Referer: referer },
-        withCredentials: true,
-        decompress: true,
-        validateStatus: status => status < 500 // Let 403/404 through for custom handling
-    });
-};
-
-// --- Playwright helper ---
-const fetchWithPlaywright = async (url) => {
-    const browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({
-        userAgent: browserHeaders['User-Agent'],
-        locale: 'en-US',
-        viewport: { width: 1280, height: 800 },
-    });
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-    // Wait for .items .item or up to 20s
-    try {
-        await page.waitForSelector('.items .item', { timeout: 20000 });
-    } catch (e) {
-        // fallback: wait for any content
-        await page.waitForTimeout(3000);
-    }
-
-    // Human-like scroll
-    await page.mouse.move(200 + Math.random() * 200, 200 + Math.random() * 200);
-    await page.waitForTimeout(500 + Math.random() * 1000);
-    await page.evaluate(() => window.scrollBy(0, 200 + Math.random() * 200));
-    await page.waitForTimeout(1000 + Math.random() * 1000);
-
-    const content = await page.content();
-    await browser.close();
-    return content;
-};
-
-// --- Example: fallback to Playwright if axios gets 403 ---
 const scrapeFeatured = async (page = 1) => {
     const cacheKey = `featured_page_${page}`;
     if (cache.has(cacheKey)) {
         return cache.get(cacheKey); 
     }
 
-    const url = `${BASE_URL}/featured/page/${page}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
-        return parseFeaturedHtml(data, page, cacheKey);
+        const { data } = await axios.get(`${BASE_URL}/featured/page/${page}/`);
+        const $ = cheerio.load(data);
+        const results = [];
+
+        $('.items .item').each((_, el) => {
+            const title = $(el).find('h3 a').text().trim();
+            const id = $(el).find('a[href^="https://javgg.net/jav/"]').attr('href').split('/').slice(-2, -1)[0];
+            const image = $(el).find('img').attr('src');
+            const date = $(el).find('.data span').text().trim();
+
+            results.push({ id, title, image, date });
+        });
+
+        const paginationText = $('.pagination span').first().text();
+        const totalPages = parseInt(paginationText.split('of')[1].trim(), 10);
+        const currentPage = parseInt(paginationText.split(' ')[1], 10);
+
+        const result = {
+            provider: 'javgg',
+            type: 'featured',
+            totalPages,
+            currentPage,
+            results,
+        };
+
+        cache.set(cacheKey, result); 
+        return result;
     } catch (error) {
-        // If 403, try Playwright as fallback
-        if (error.response && error.response.status === 403) {
-            const html = await fetchWithPlaywright(url);
-            return parseFeaturedHtml(html, page, cacheKey);
-        }
         throw new Error(`Failed to scrape Javgg: ${error.message}`);
     }
 };
 
-function parseFeaturedHtml(html, page, cacheKey) {
-    const $ = cheerio.load(html);
-    const results = [];
-    $('.items .item').each((_, el) => {
-        const title = $(el).find('h3 a').text().trim();
-        const id = $(el).find('a[href*="/jav/"]').attr('href')?.split('/jav/')[1]?.replace(/\//g, '');
-        let image = $(el).find('img').attr('src');
-        if (image && image.startsWith('//')) image = 'https:' + image;
-        if (image && image.startsWith('/')) image = BASE_URL + image;
-        const date = $(el).find('.data span').text().trim();
-        if (title && id && image) {
-            results.push({ id, title, image, date });
-        }
-    });
-
-    const paginationText = $('.pagination span').first().text();
-    let totalPages = 1, currentPage = page;
-    if (paginationText && paginationText.includes('of')) {
-        totalPages = parseInt(paginationText.split('of')[1].trim(), 10);
-        currentPage = parseInt(paginationText.split(' ')[1], 10);
-    }
-
-    const result = {
-        provider: 'javgg',
-        type: 'featured',
-        totalPages,
-        currentPage,
-        results,
-    };
-
-    cache.set(cacheKey, result); 
-    return result;
-}
-
-// --- Replace other Puppeteer usages with fetchWithPlaywright as needed ---
-
-// --- Trending, Search, and other scrape functions ---
 const scrapeTrending = async (page = 1, sort = 'today') => {
+    // sort: 'today', 'month', 'weekly', 'monthly', 'all'
     const sortMap = {
         today: 'today',
         month: 'month',
@@ -138,62 +59,53 @@ const scrapeTrending = async (page = 1, sort = 'today') => {
         return cache.get(cacheKey); 
     }
 
-    let url;
-    if (sortParam === 'all') {
-        url = page === 1
-            ? `${BASE_URL}/trending/`
-            : `${BASE_URL}/trending/page/${page}/`;
-    } else {
-        url = page === 1
-            ? `${BASE_URL}/trending/?sort=${sortParam}`
-            : `${BASE_URL}/trending/page/${page}/?sort=${sortParam}`;
-    }
-
     try {
-        const { data } = await axiosWithHeaders(url);
-        return parseTrendingHtml(data, page, sortParam, cacheKey);
-    } catch (error) {
-        // If 403, try Playwright as fallback
-        if (error.response && error.response.status === 403) {
-            const html = await fetchWithPlaywright(url);
-            return parseTrendingHtml(html, page, sortParam, cacheKey);
+        let url;
+        if (sortParam === 'all') {
+            url = page === 1
+                ? `${BASE_URL}/trending/`
+                : `${BASE_URL}/trending/page/${page}/`;
+        } else {
+            url = page === 1
+                ? `${BASE_URL}/trending/?sort=${sortParam}`
+                : `${BASE_URL}/trending/page/${page}/?sort=${sortParam}`;
         }
+        const { data } = await axios.get(url);
+        const $ = cheerio.load(data);
+        const results = [];
+
+        $('.items .item').each((_, el) => {
+            const title = $(el).find('h3 a').text().trim();
+            const id = $(el).find('a[href^="https://javgg.net/jav/"]').attr('href').split('/').slice(-2, -1)[0];
+            const image = $(el).find('img').attr('src');
+            const date = $(el).find('.data span').text().trim();
+
+            results.push({ id, title, image, date });
+        });
+
+        const paginationText = $('.pagination span').first().text();
+        let totalPages = 1;
+        let currentPage = page;
+        if (paginationText && paginationText.includes('of')) {
+            totalPages = parseInt(paginationText.split('of')[1].trim(), 10);
+            currentPage = parseInt(paginationText.split(' ')[1], 10);
+        }
+
+        const result = {
+            provider: 'javgg',
+            type: 'trending',
+            sort: sortParam,
+            totalPages,
+            currentPage,
+            results,
+        };
+
+        cache.set(cacheKey, result); 
+        return result;
+    } catch (error) {
         throw new Error(`Failed to scrape Javgg Trending: ${error.message}`);
     }
 };
-
-// Helper to parse trending HTML (shared by axios and puppeteer)
-function parseTrendingHtml(html, page, sortParam, cacheKey) {
-    const $ = cheerio.load(html);
-    const results = [];
-    $('.items .item').each((_, el) => {
-        const title = $(el).find('h3 a').text().trim();
-        const id = $(el).find('a[href^="https://javgg.net/jav/"]').attr('href').split('/').slice(-2, -1)[0];
-        const image = $(el).find('img').attr('src');
-        const date = $(el).find('.data span').text().trim();
-        results.push({ id, title, image, date });
-    });
-
-    const paginationText = $('.pagination span').first().text();
-    let totalPages = 1;
-    let currentPage = page;
-    if (paginationText && paginationText.includes('of')) {
-        totalPages = parseInt(paginationText.split('of')[1].trim(), 10);
-        currentPage = parseInt(paginationText.split(' ')[1], 10);
-    }
-
-    const result = {
-        provider: 'javgg',
-        type: 'trending',
-        sort: sortParam,
-        totalPages,
-        currentPage,
-        results,
-    };
-
-    cache.set(cacheKey, result); 
-    return result;
-}
 
 const scrapeSearch = async (query, page = 1) => {
     const cacheKey = `search_${query}_page_${page}`;
@@ -202,7 +114,7 @@ const scrapeSearch = async (query, page = 1) => {
     }
 
     try {
-        const { data } = await axiosWithHeaders(`${BASE_URL}/?s=${encodeURIComponent(query)}&page=${page}`);
+        const { data } = await axios.get(`${BASE_URL}/?s=${encodeURIComponent(query)}&page=${page}`);
         const $ = cheerio.load(data);
         const results = [];
 
@@ -247,7 +159,7 @@ const scrapeMultiplePages = async (totalPages, scrapeFunction) => {
 const scrapeJavDetails = async (javId) => {
     const url = `${BASE_URL}/jav/${javId}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const image = $('#coverimage .cover').attr('src');
         const images = [];
@@ -315,7 +227,7 @@ const scrapeJavDetails = async (javId) => {
 const scrapeJavServers = async (javId) => {
     const url = `${BASE_URL}/jav/${javId}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const servers = [];
 
@@ -344,7 +256,7 @@ const scrapeJavServers = async (javId) => {
 const scrapeJavGenre = async (genre, page = 1) => {
     const url = `${BASE_URL}/genre/${genre}/page/${page}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const results = [];
 
@@ -378,7 +290,7 @@ const scrapeJavGenre = async (genre, page = 1) => {
 const scrapeJavggRecent = async (page = 1) => {
     const url = `${BASE_URL}/new-post/page/${page}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const results = [];
 
@@ -413,7 +325,7 @@ const scrapeJavggRecent = async (page = 1) => {
 const scrapeJavggRandom = async (page = 1) => {
     const url = `${BASE_URL}/random/page/${page}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const results = [];
 
@@ -450,7 +362,7 @@ const scrapeJavggRandom = async (page = 1) => {
 const scrapeJavGenres = async () => {
     const url = `${BASE_URL}/genre/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const genres = [];
 
@@ -474,7 +386,7 @@ const scrapeJavGenres = async () => {
 const scrapeJavStars = async () => {
     const url = `${BASE_URL}/star/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const stars = [];
 
@@ -498,7 +410,7 @@ const scrapeJavStars = async () => {
 const scrapeJavTopActress = async () => {
     const url = `${BASE_URL}/top-actress/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const actresses = [];
 
@@ -534,7 +446,7 @@ const scrapeJavStar = async (starId, page = 1) => {
     // Always use /star/{id}/page/{page}/ for all pages, including page 1
     const url = `${BASE_URL}/star/${starId}/page/${page}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
 
         // Actress profile
@@ -596,7 +508,7 @@ const scrapeJavStar = async (starId, page = 1) => {
 const scrapeJavTags = async () => {
     const url = `${BASE_URL}/tag/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const tags = [];
 
@@ -623,7 +535,7 @@ const scrapeJavggTrending = scrapeTrending;
 const scrapeJavTag = async (tag, page = 1) => {
     const url = `${BASE_URL}/tag/${tag}/page/${page}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const results = [];
 
@@ -659,7 +571,7 @@ const scrapeJavTag = async (tag, page = 1) => {
 const scrapeJavMakers = async () => {
     const url = `${BASE_URL}/maker/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
         const makers = [];
 
@@ -689,7 +601,7 @@ const scrapeJavMaker = async (makerId, page = 1) => {
     // makerId: the id from /maker/{id}/, page: page number (default 1)
     const url = `${BASE_URL}/maker/${makerId}/page/${page}/`;
     try {
-        const { data } = await axiosWithHeaders(url);
+        const { data } = await axios.get(url);
         const $ = cheerio.load(data);
 
         // Get maker name from <h1>
