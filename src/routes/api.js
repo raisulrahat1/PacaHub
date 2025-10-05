@@ -7,7 +7,7 @@ const javgg = require('../providers/jav/javgg/javggscraper');
 const javggvidlink = require('../providers/jav/javgg/javggvidlink');
 const hentaimama = require('../providers/hentai/hentaimama');
 const { hentaimamaSearch } = require('../providers/hentai/hentaimama');
-const javtsunami = require('../providers/jav/javtsunami/javtsunamiscraper'); // Add this near your other requires
+const javtsunami = require('../providers/jav/javtsunami/javtsunamiscraper');
 
 
 // Helper function to handle responses
@@ -58,33 +58,25 @@ router.get('/jav/javgg/servers/:id', (req, res) => handleResponse(res, javgg.scr
 router.get('/jav/javgg/watch/:id', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.query.server)));
 router.get('/jav/javgg/watch/:id/:server', (req, res) => handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.params.server)));
 router.get('/jav/javgg/genre/:genre/:page?', (req, res) => handleResponse(res, javgg.scrapeJavGenre(req.params.genre, req.params.page || 1)));
-// Add this route for JAVGG genre list
 router.get('/jav/javgg/genre-list', (req, res) => handleResponse(res, javgg.scrapeJavGenres()));
-// Add this route for JAVGG star list
 router.get('/jav/javgg/star-list', (req, res) => handleResponse(res, javgg.scrapeJavStars()));
-// Add this route for JAVGG top actress list
 router.get('/jav/javgg/top-actress', (req, res) => handleResponse(res, javgg.scrapeJavTopActress()));
-// Add this route for JAVGG actress profile and movies
 router.get('/jav/javgg/star/:id/:page?', (req, res) =>
     handleResponse(
         res,
         javgg.scrapeJavStar(req.params.id, req.params.page ? parseInt(req.params.page, 10) : 1)
     )
 );
-// Add this route for JAVGG tag list (only tag names)
 router.get('/jav/javgg/tag-list', (req, res) => handleResponse(res, javgg.scrapeJavTags()));
-// Add this route for JAVGG tag movies by tag name and page
 router.get('/jav/javgg/tag/:tag/:page?', (req, res) =>
     handleResponse(
         res,
         javgg.scrapeJavTag(req.params.tag, req.params.page ? parseInt(req.params.page, 10) : 1)
     )
 );
-// Add this route for JAVGG maker list
 router.get('/jav/javgg/maker-list', (req, res) =>
     handleResponse(res, javgg.scrapeJavMakers())
 );
-// Add this route for JAVGG maker movies by maker id and page
 router.get('/jav/javgg/maker/:id/:page?', (req, res) =>
     handleResponse(
         res,
@@ -105,7 +97,6 @@ router.get('/hen/mama/series/:page?', (req, res) =>
         )
     )
 );
-// Add this route for genre
 router.get('/hen/mama/genre-list', (req, res) => handleResponse(res, hentaimama.scrapeGenreList()));
 router.get('/hen/mama/genre/:genre/page/:page', (req, res) =>
     handleResponse(
@@ -133,17 +124,18 @@ router.get('/hen/mama/search', async (req, res) => {
 // --- JAVTsunami endpoints ---
 
 // Featured section (use category 'featured' for this endpoint)
-router.get('/jav/tsunami/featured', (req, res) => {
-    const page = parseInt(req.query.page, 10) || 1;
+router.get('/jav/tsunami/featured/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
     const filter = req.query.filter || 'latest'; // filter: latest, most-viewed, longest, random
-    handleResponse(res, javtsunami.scrapeCategory('featured', page, filter));
+    handleResponse(res, javtsunami.scrapeFeatured(page, filter));
 });
 
-// Category section
-router.get('/jav/tsunami/category/:category', (req, res) => {
-    const page = parseInt(req.query.page, 10) || 1;
-    const filter = req.query.filter || 'latest';
-    handleResponse(res, javtsunami.scrapeCategory(req.params.category, page, filter));
+// Category section with page parameter (uses scrapeCategoryPage for all categories)
+router.get('/jav/tsunami/category/:category/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
+    // Allow ?filter=most-viewed or ?filter=latest etc.
+    const filter = typeof req.query.filter === 'string' ? req.query.filter : 'latest';
+    handleResponse(res, javtsunami.scrapeCategoryPage(req.params.category, page, filter));
 });
 
 // Watch servers (DoodStream, etc.)
@@ -154,27 +146,33 @@ router.get('/jav/tsunami/watch/:id', (req, res) => {
     handleResponse(res, javtsunami.scrapeWatch(videoPath));
 });
 
-// Add this route for JAVTsunami tag list
+// Tag list
 router.get('/jav/tsunami/tag-list', (req, res) => {
     handleResponse(res, javtsunami.scrapeTagList());
 });
 
-// Add this route for JAVTsunami tag movies (same as category, but for tags)
-router.get('/jav/tsunami/tag/:tag', (req, res) => {
-    const page = parseInt(req.query.page, 10) || 1;
+// Tag movies with page parameter
+router.get('/jav/tsunami/tag/:tag/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
     const filter = req.query.filter || 'latest';
     handleResponse(res, javtsunami.scrapeTag(req.params.tag, page, filter));
 });
 
-// Add this route for JAVTsunami search (same as category, but for search query)
+// Search
 router.get('/jav/tsunami/search', (req, res) => {
     const query = req.query.q || '';
     const page = parseInt(req.query.page, 10) || 1;
     if (!query) {
         return res.status(400).json({ status: 'error', message: 'Missing query parameter ?q=' });
     }
-    // Remove filter param for search
     handleResponse(res, javtsunami.scrapeSearch(query, page));
+});
+
+// Latest uploads with page parameter
+router.get('/jav/tsunami/latest/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
+    const filter = req.query.filter || 'latest';
+    handleResponse(res, javtsunami.scrapeLatest(page, filter));
 });
 
 module.exports = router;
