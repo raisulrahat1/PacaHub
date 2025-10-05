@@ -142,13 +142,164 @@ async function scrapeWatch(videoPath) {
 
 // Helper to get total pages from pagination
 function getTotalPages($) {
-    // Try to find a pagination element with the last page number
-    let totalPages = 1;
-    const lastPage = $('.pagination a.page-numbers').last().text().trim();
-    if (lastPage && !isNaN(Number(lastPage))) {
-        totalPages = Number(lastPage);
+    // Try to find a "Last" link first
+    const lastHref = $('.pagination a:contains("Last")').attr('href');
+    if (lastHref) {
+        const match = lastHref.match(/page\/(\d+)/);
+        if (match) return parseInt(match[1], 10);
     }
-    return totalPages;
+    // Fallback: get the highest numbered page link
+    let maxPage = 1;
+    $('.pagination a').each((_, el) => {
+        const txt = $(el).text().trim();
+        const num = parseInt(txt, 10);
+        if (!isNaN(num) && num > maxPage) maxPage = num;
+    });
+    return maxPage;
+}
+
+// --- Scrape featured videos with filter ---
+async function scrapeFeatured(page = 1, filter = 'latest') {
+    // Allow filter param: latest, most-viewed, longest, random, etc.
+    let url = `${BASE_URL}/category/featured?filter=${filter}`;
+    if (page > 1) {
+        url = `${BASE_URL}/category/featured/page/${page}?filter=${filter}`;
+    }
+    const { data } = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        }
+    });
+    const $ = cheerio.load(data);
+
+    const totalPages = getTotalPages($);
+
+    let videos = [];
+    $('.videos-list article').each((_, el) => {
+        const $el = $(el);
+        const a = $el.find('a').first();
+        const videoTitle = a.attr('title') || $el.find('.entry-header span').text().trim();
+        const id = a.attr('href') ? a.attr('href').replace(/^https:\/\/javtsunami\.com\/|\.html$/g, '') : null;
+        const img = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const duration = $el.find('.duration').text().trim();
+        const views = $el.find('.views').text().trim();
+        videos.push({
+            id,
+            title: videoTitle,
+            img,
+            duration,
+            views,
+        });
+    });
+
+    let total = videos.length;
+
+    return {
+        page,
+        total,
+        totalPages,
+        videos
+    };
+}
+
+// --- Scrape any category page (including featured) with filter ---
+async function scrapeCategoryPage(category = 'featured', page = 1, filter = 'latest') {
+    // Allow filter param: latest, most-viewed, longest, random, etc.
+    let url = `${BASE_URL}/category/${category}?filter=${filter}`;
+    if (page > 1) {
+        url = `${BASE_URL}/category/${category}/page/${page}?filter=${filter}`;
+    }
+    const { data } = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        }
+    });
+    const $ = cheerio.load(data);
+
+    const totalPages = getTotalPages($);
+
+    let videos = [];
+    $('.videos-list article').each((_, el) => {
+        const $el = $(el);
+        const a = $el.find('a').first();
+        const videoTitle = a.attr('title') || $el.find('.entry-header span').text().trim();
+        const id = a.attr('href') ? a.attr('href').replace(/^https:\/\/javtsunami\.com\/|\.html$/g, '') : null;
+        const img = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const duration = $el.find('.duration').text().trim();
+        const views = $el.find('.views').text().trim();
+        videos.push({
+            id,
+            title: videoTitle,
+            img,
+            duration,
+            views,
+        });
+    });
+
+    let total = videos.length;
+
+    return {
+        page,
+        total,
+        totalPages,
+        videos
+    };
+}
+
+// NEW: Get pagination info for any page type
+async function getPageInfo(type, identifier = null, page = 1, filter = 'latest') {
+    let url = '';
+    
+    switch(type) {
+        case 'featured':
+            url = page > 1 
+                ? `${BASE_URL}/category/featured/page/${page}?filter=${filter}`
+                : `${BASE_URL}/category/featured?filter=${filter}`;
+            break;
+        case 'category':
+            url = page > 1 
+                ? `${BASE_URL}/category/${identifier}/page/${page}?filter=${filter}`
+                : `${BASE_URL}/category/${identifier}?filter=${filter}`;
+            break;
+        case 'tag':
+            url = page > 1 
+                ? `${BASE_URL}/tag/${identifier}/page/${page}?filter=${filter}`
+                : `${BASE_URL}/tag/${identifier}?filter=${filter}`;
+            break;
+        case 'search':
+            url = page > 1 
+                ? `${BASE_URL}/page/${page}/?s=${encodeURIComponent(identifier)}`
+                : `${BASE_URL}/?s=${encodeURIComponent(identifier)}`;
+            break;
+        case 'latest':
+            url = page > 1 
+                ? `${BASE_URL}/page/${page}?filter=${filter}`
+                : `${BASE_URL}/?filter=${filter}`;
+            break;
+        default:
+            throw new Error('Invalid type. Use: featured, category, tag, search, or latest');
+    }
+
+    const { data } = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        }
+    });
+    const $ = cheerio.load(data);
+
+    const totalPages = getTotalPages($);
+    const currentPage = page;
+    const hasNextPage = currentPage < totalPages;
+    const hasPrevPage = currentPage > 1;
+
+    return {
+        currentPage,
+        totalPages,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? currentPage + 1 : null,
+        prevPage: hasPrevPage ? currentPage - 1 : null
+    };
 }
 
 // Scrape category with total pages
@@ -207,57 +358,6 @@ async function scrapeTag(tag, page = 1, filter = 'latest') {
     let url = `${BASE_URL}/tag/${tag}?filter=${filter}`;
     if (page > 1) {
         url = `${BASE_URL}/tag/${tag}/page/${page}?filter=${filter}`;
-    }
-    const { data } = await axios.get(url, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        }
-    });
-    const $ = cheerio.load(data);
-
-    const totalPages = getTotalPages($);
-    if (page > totalPages) {
-        return {
-            page,
-            total: 0,
-            totalPages,
-            videos: []
-        };
-    }
-
-    let videos = [];
-    $('.videos-list article').each((_, el) => {
-        const $el = $(el);
-        const a = $el.find('a').first();
-        const videoTitle = a.attr('title') || $el.find('.entry-header span').text().trim();
-        const id = a.attr('href') ? a.attr('href').replace(/^https:\/\/javtsunami\.com\/|\.html$/g, '') : null;
-        const img = $el.find('img').attr('data-src') || $el.find('img').attr('src');
-        const duration = $el.find('.duration').text().trim();
-        const views = $el.find('.views').text().trim();
-        videos.push({
-            id,
-            title: videoTitle,
-            img,
-            duration,
-            views,
-        });
-    });
-
-    let total = videos.length;
-
-    return {
-        page,
-        total,
-        totalPages,
-        videos
-    };
-}
-
-// Scrape search results with total pages
-async function scrapeSearch(query, page = 1, filter = 'latest') {
-    let url = `${BASE_URL}/?s=${encodeURIComponent(query)}&filter=${filter}`;
-    if (page > 1) {
-        url = `${BASE_URL}/page/${page}/?s=${encodeURIComponent(query)}&filter=${filter}`;
     }
     const { data } = await axios.get(url, {
         headers: {
@@ -379,14 +479,170 @@ async function scrapeSearch(query, page = 1) {
     return {
         page,
         total,
+        totalPages,
+        videos
+    };
+}
+
+// Scrape latest videos with total pages
+async function scrapeLatest(page = 1, filter = 'latest') {
+    let url = `${BASE_URL}/?filter=${filter}`;
+    if (page > 1) {
+        url = `${BASE_URL}/page/${page}?filter=${filter}`;
+    }
+    const { data } = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        }
+    });
+    const $ = cheerio.load(data);
+
+    // Get total pages from pagination
+    let totalPages = 1;
+    const lastPageHref = $('.pagination a:contains("Last")').attr('href');
+    if (lastPageHref) {
+        const match = lastPageHref.match(/page\/(\d+)/);
+        if (match) totalPages = parseInt(match[1], 10);
+    }
+
+    let videos = [];
+    $('.videos-list article').each((_, el) => {
+        const $el = $(el);
+        const a = $el.find('a').first();
+        const videoTitle = a.attr('title') || $el.find('.entry-header span').text().trim();
+        const id = a.attr('href') ? a.attr('href').replace(/^https:\/\/javtsunami\.com\/|\.html$/g, '') : null;
+        const img = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const duration = $el.find('.duration').text().trim();
+        const views = $el.find('.views').text().trim();
+        videos.push({
+            id,
+            title: videoTitle,
+            img,
+            duration,
+            views,
+        });
+    });
+
+    let total = videos.length;
+
+    return {
+        page,
+        total,
+        totalPages,
+        videos
+    };
+}
+
+// Scrape featured videos with total pages
+async function scrapeFeatured(page = 1, filter = 'latest') {
+    let url = `${BASE_URL}/category/featured?filter=${filter}`;
+    if (page > 1) {
+        url = `${BASE_URL}/category/featured/page/${page}?filter=${filter}`;
+    }
+    const { data } = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        }
+    });
+    const $ = cheerio.load(data);
+
+    const totalPages = getTotalPages($);
+    if (page > totalPages) {
+        return {
+            page,
+            total: 0,
+            totalPages,
+            videos: []
+        };
+    }
+
+    let videos = [];
+    $('.videos-list article').each((_, el) => {
+        const $el = $(el);
+        const a = $el.find('a').first();
+        const videoTitle = a.attr('title') || $el.find('.entry-header span').text().trim();
+        const id = a.attr('href') ? a.attr('href').replace(/^https:\/\/javtsunami\.com\/|\.html$/g, '') : null;
+        const img = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const duration = $el.find('.duration').text().trim();
+        const views = $el.find('.views').text().trim();
+        videos.push({
+            id,
+            title: videoTitle,
+            img,
+            duration,
+            views,
+        });
+    });
+
+    let total = videos.length;
+
+    return {
+        page,
+        total,
+        totalPages,
+        videos
+    };
+}
+
+// Scrape any category page (including featured) with total pages
+async function scrapeCategoryPage(category = 'featured', page = 1, filter = 'latest') {
+    let url = `${BASE_URL}/category/${category}?filter=${filter}`;
+    if (page > 1) {
+        url = `${BASE_URL}/category/${category}/page/${page}?filter=${filter}`;
+    }
+    const { data } = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        }
+    });
+    const $ = cheerio.load(data);
+
+    const totalPages = getTotalPages($);
+    if (page > totalPages) {
+        return {
+            page,
+            total: 0,
+            totalPages,
+            videos: []
+        };
+    }
+
+    let videos = [];
+    $('.videos-list article').each((_, el) => {
+        const $el = $(el);
+        const a = $el.find('a').first();
+        const videoTitle = a.attr('title') || $el.find('.entry-header span').text().trim();
+        const id = a.attr('href') ? a.attr('href').replace(/^https:\/\/javtsunami\.com\/|\.html$/g, '') : null;
+        const img = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const duration = $el.find('.duration').text().trim();
+        const views = $el.find('.views').text().trim();
+        videos.push({
+            id,
+            title: videoTitle,
+            img,
+            duration,
+            views,
+        });
+    });
+
+    let total = videos.length;
+
+    return {
+        page,
+        total,
+        totalPages,
         videos
     };
 }
 
 module.exports = {
     scrapeCategory,
+    scrapeCategoryPage,
+    scrapeFeatured,
     scrapeWatch,
     scrapeTagList,
     scrapeTag,
-    scrapeSearch
+    scrapeSearch,
+    scrapeLatest,
+    getPageInfo
 };
