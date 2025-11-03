@@ -129,6 +129,13 @@ router.get('/hen/mama/search', async (req, res) => {
 
 // --- JAVTsunami endpoints ---
 
+// Latest uploads with page parameter
+router.get('/jav/tsunami/latest/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
+    const filter = req.query.filter || 'latest';
+    handleResponse(res, javtsunami.scrapeLatest(page, filter));
+});
+
 // Featured section (use category 'featured' for this endpoint)
 router.get('/jav/tsunami/featured/:page?', (req, res) => {
     const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
@@ -136,23 +143,29 @@ router.get('/jav/tsunami/featured/:page?', (req, res) => {
     handleResponse(res, javtsunami.scrapeFeatured(page, filter));
 });
 
-// Category section with page parameter (uses scrapeCategoryPage for all categories)
+// Get all categories
+router.get('/jav/tsunami/categories', (req, res) => {
+    handleResponse(res, javtsunami.getCategories());
+});
+
+// Category section with page parameter
 router.get('/jav/tsunami/category/:category/:page?', (req, res) => {
     const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
-    // Allow ?filter=most-viewed or ?filter=latest etc.
     const filter = typeof req.query.filter === 'string' ? req.query.filter : 'latest';
-    handleResponse(res, javtsunami.scrapeCategoryPage(req.params.category, page, filter));
+    handleResponse(res, javtsunami.scrapeCategory(req.params.category, page, filter));
 });
 
 // Watch servers (DoodStream, etc.)
 router.get('/jav/tsunami/watch/:id', (req, res) => {
-    // Accepts /jav/tsunami/watch/:id where :id is the slug (with or without .html)
     let id = req.params.id.replace(/\.html$/, '');
-    let videoPath = `/watch/${id}`;
-    handleResponse(res, javtsunami.scrapeWatch(videoPath));
+    handleResponse(res, javtsunami.scrapeWatch(id));
 });
 
 // Tag list
+router.get('/jav/tsunami/tags', (req, res) => {
+    handleResponse(res, javtsunami.scrapeTagList());
+});
+
 router.get('/jav/tsunami/tag-list', (req, res) => {
     handleResponse(res, javtsunami.scrapeTagList());
 });
@@ -162,6 +175,19 @@ router.get('/jav/tsunami/tag/:tag/:page?', (req, res) => {
     const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
     const filter = req.query.filter || 'latest';
     handleResponse(res, javtsunami.scrapeTag(req.params.tag, page, filter));
+});
+
+// Get all actors
+router.get('/jav/tsunami/actors', (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const perPage = parseInt(req.query.per_page, 10) || 100;
+    handleResponse(res, javtsunami.getActors(page, perPage));
+});
+
+// Browse by actor
+router.get('/jav/tsunami/actor/:actor/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
+    handleResponse(res, javtsunami.getPostsByTag(req.params.actor, page, 10));
 });
 
 // Search
@@ -174,11 +200,17 @@ router.get('/jav/tsunami/search', (req, res) => {
     handleResponse(res, javtsunami.scrapeSearch(query, page));
 });
 
-// Latest uploads with page parameter
-router.get('/jav/tsunami/latest/:page?', (req, res) => {
-    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
-    const filter = req.query.filter || 'latest';
-    handleResponse(res, javtsunami.scrapeLatest(page, filter));
+// Random video
+router.get('/jav/tsunami/random', (req, res) => {
+    handleResponse(
+        res, 
+        javtsunami.getPosts(1, 1, 'random').then(result => {
+            if (result.videos && result.videos.length > 0) {
+                return result.videos[0];
+            }
+            throw new Error('No videos found');
+        })
+    );
 });
 
 module.exports = router;
