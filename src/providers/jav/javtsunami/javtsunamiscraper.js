@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { enhanceServerWithMedia } = require('../../../utils/iframe/turbovidhls');
 
 const BASE_URL = 'https://javtsunami.com';
 const API_BASE = `${BASE_URL}/wp-json/wp/v2`;
@@ -9,7 +10,7 @@ const axiosConfig = {
     headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     },
-    timeout: 10000
+    timeout: 15000
 };
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -41,9 +42,7 @@ function cleanHTML(html) {
 
 function cleanURL(url) {
     if (!url) return null;
-    // Remove leading semicolons, whitespace, and fix common issues
     let cleaned = url.replace(/^[;\s]+/, '').trim();
-    // Ensure it starts with http
     if (cleaned && !cleaned.startsWith('http')) {
         cleaned = 'https://' + cleaned;
     }
@@ -52,18 +51,13 @@ function cleanURL(url) {
 
 function extractImageFromAPI(post) {
     try {
-        // Try multiple methods to extract image from API response
-        
-        // Method 1: _embedded wp:featuredmedia
         if (post._embedded?.['wp:featuredmedia']?.[0]) {
             const media = post._embedded['wp:featuredmedia'][0];
             
-            // Try source_url
             if (media.source_url) {
                 return cleanURL(media.source_url);
             }
             
-            // Try media_details sizes
             if (media.media_details?.sizes) {
                 const sizes = media.media_details.sizes;
                 const sizeUrl = sizes.full?.source_url || 
@@ -74,19 +68,11 @@ function extractImageFromAPI(post) {
                 if (sizeUrl) return cleanURL(sizeUrl);
             }
             
-            // Try guid
             if (media.guid?.rendered) {
                 return cleanURL(media.guid.rendered);
             }
         }
         
-        // Method 2: Direct featured_media with link
-        if (post.featured_media && post._links?.['wp:featuredmedia']?.[0]?.href) {
-            // We'll need to fetch this separately
-            return null; // Signal that we need to fetch
-        }
-        
-        // Method 3: Check content for images
         if (post.content?.rendered) {
             const imgMatch = post.content.rendered.match(/<img[^>]+src="([^">]+)"/);
             if (imgMatch && imgMatch[1]) {
@@ -109,21 +95,6 @@ async function fetchFeaturedImage(featuredMediaUrl) {
         console.error('Error fetching featured image:', error.message);
         return null;
     }
-}
-
-function getTotalPages($) {
-    const lastHref = $('.pagination a:contains("Last")').attr('href');
-    if (lastHref) {
-        const match = lastHref.match(/page\/(\d+)/);
-        if (match) return parseInt(match[1], 10);
-    }
-    let maxPage = 1;
-    $('.pagination a').each((_, el) => {
-        const txt = $(el).text().trim();
-        const num = parseInt(txt, 10);
-        if (!isNaN(num) && num > maxPage) maxPage = num;
-    });
-    return maxPage;
 }
 
 function extractVideoCode(title) {
@@ -151,6 +122,162 @@ function extractSubtitleLanguages(tags) {
     return [...new Set(languages)];
 }
 
+// ==================== IMPROVED TAXONOMY IMAGE EXTRACTION ====================
+
+/**
+ * Extract image from taxonomy term page using multiple strategies
+ */
+async function scrapeTaxonomyImage(taxonomyType, slug) {
+    const urlMap = {
+        'actors': `${BASE_URL}/actor/${slug}`,
+        'categories': `${BASE_URL}/category/${slug}`,
+        'tags': `${BASE_URL}/tag/${slug}`
+    };
+    
+    const url = urlMap[taxonomyType] || `${BASE_URL}/${taxonomyType}/${slug}`;
+    
+    try {
+        const { data } = await axios.get(url, axiosConfig);
+        const $ = cheerio.load(data);
+        
+        // Strategy 1: Open Graph image (most reliable)
+        let image = $('meta[property="og:image"]').attr('content');
+        if (image && !image.includes('Best%2BJAV%2BActors.jpg')) {
+            return cleanURL(image);
+        }
+        
+        // Strategy 2: Twitter card image
+        image = $('meta[name="twitter:image"]').attr('content');
+        if (image && !image.includes('Best%2BJAV%2BActors.jpg')) {
+            return cleanURL(image);
+        }
+        
+        // Strategy 3: First article thumbnail (actor's latest video)
+        const firstArticle = $('article.thumb-block').first();
+        if (firstArticle.length) {
+            image = firstArticle.find('img').attr('data-src') || 
+                    firstArticle.find('img').attr('src') ||
+                    firstArticle.find('img').attr('data-lazy-src');
+            
+            // Validate it's not a placeholder
+            if (image && !image.includes('px.gif') && !image.includes('placeholder')) {
+                return cleanURL(image);
+            }
+        }
+        
+        // Strategy 4: Schema.org ImageObject
+        const schemaScript = $('script[type="application/ld+json"]').first().html();
+        if (schemaScript) {
+            try {
+                const schema = JSON.parse(schemaScript);
+                if (schema['@graph']) {
+                    const imageObj = schema['@graph'].find(item => item['@type'] === 'ImageObject');
+                    if (imageObj?.url && !imageObj.url.includes('Best%2BJAV%2BActors.jpg')) {
+                        return cleanURL(imageObj.url);
+                    }
+                }
+            } catch (e) {
+                // Schema parsing failed, continue to next strategy
+            }
+        }
+        
+        // Strategy 5: Any visible content images (last resort)
+        const contentImages = $('.site-content img, .entry-content img, article img');
+        for (let i = 0; i < Math.min(contentImages.length, 3); i++) {
+            const $img = contentImages.eq(i);
+            image = $img.attr('data-src') || $img.attr('src') || $img.attr('data-lazy-src');
+            
+            if (image && 
+                !image.includes('px.gif') && 
+                !image.includes('placeholder') &&
+                !image.includes('Best%2BJAV%2BActors.jpg') &&
+                !image.includes('logo') &&
+                !image.includes('icon')) {
+                return cleanURL(image);
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error(`Error scraping ${taxonomyType} image for ${slug}:`, error.message);
+        return null;
+    }
+}
+
+/**
+ * Enhance taxonomy term with image - with better caching
+ */
+const imageCache = new Map();
+
+async function enhanceTaxonomyWithImage(term, taxonomyType) {
+    if (!term || !term.slug) return term;
+    
+    const cacheKey = `${taxonomyType}:${term.slug}`;
+    
+    // Check cache first
+    if (imageCache.has(cacheKey)) {
+        const cachedImage = imageCache.get(cacheKey);
+        return {
+            ...term,
+            thumbnail: cachedImage
+        };
+    }
+    
+    try {
+        let imageUrl = null;
+        
+        // Try to extract from description HTML if present
+        if (term.description) {
+            const imgMatch = term.description.match(/<img[^>]+src="([^">]+)"/);
+            if (imgMatch && imgMatch[1] && !imgMatch[1].includes('Best%2BJAV%2BActors.jpg')) {
+                imageUrl = cleanURL(imgMatch[1]);
+            }
+        }
+        
+        // If no image found in description, scrape the taxonomy page
+        if (!imageUrl) {
+            imageUrl = await scrapeTaxonomyImage(taxonomyType, term.slug);
+        }
+        
+        // Cache the result (even if null)
+        imageCache.set(cacheKey, imageUrl);
+        
+        return {
+            ...term,
+            thumbnail: imageUrl
+        };
+    } catch (error) {
+        console.error(`Error enhancing ${taxonomyType} term:`, error.message);
+        return term;
+    }
+}
+
+/**
+ * Enhance multiple taxonomy terms with images - with controlled concurrency
+ */
+async function enhanceTaxonomyListWithImages(terms, taxonomyType) {
+    if (!Array.isArray(terms) || terms.length === 0) return terms;
+    
+    // Process in smaller batches to avoid overwhelming the server
+    const batchSize = 3;
+    const results = [];
+    
+    for (let i = 0; i < terms.length; i += batchSize) {
+        const batch = terms.slice(i, i + batchSize);
+        const enhancedBatch = await Promise.all(
+            batch.map(term => enhanceTaxonomyWithImage(term, taxonomyType))
+        );
+        results.push(...enhancedBatch);
+        
+        // Small delay between batches to be respectful
+        if (i + batchSize < terms.length) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+    }
+    
+    return results;
+}
+
 // ==================== SCRAPING FUNCTIONS ====================
 
 async function scrapeImageFromPage(videoPath) {
@@ -167,7 +294,6 @@ async function scrapeImageFromPage(videoPath) {
         const { data } = await axios.get(url, axiosConfig);
         const $ = cheerio.load(data);
         
-        // Try multiple methods to get the poster image
         const poster = $('meta[property="og:image"]').attr('content') || 
                       $('.featured-image img').attr('src') ||
                       $('.post-thumbnail img').attr('src') ||
@@ -207,6 +333,7 @@ async function scrapeServersFromPage(videoPath) {
                 else if (src.includes('streamtape')) serverType = 'StreamTape';
                 else if (src.includes('doodstream')) serverType = 'DoodStream';
                 else if (src.includes('cloudrls')) serverType = 'CloudRLS';
+                else if (src.includes('turbovid')) serverType = 'TurboVid';
                 
                 servers.push({
                     id: servers.length + 1,
@@ -218,7 +345,9 @@ async function scrapeServersFromPage(videoPath) {
             }
         });
         
-        return servers;
+        const enhancedServers = await enhanceServerWithMedia(servers);
+        
+        return enhancedServers;
     } catch (error) {
         console.error('Error scraping servers:', error.message);
         return [];
@@ -278,7 +407,6 @@ async function scrapeRelatedContent(videoPath) {
 
 async function getVideoDetails(slug) {
     try {
-        // First, try to get data from WordPress API
         const { data } = await axios.get(
             `${API_BASE}/posts?slug=${slug}&_embed=true`, 
             axiosConfig
@@ -294,47 +422,52 @@ async function getVideoDetails(slug) {
 
         const post = data[0];
         
-        // Format tags with full metadata
-        const tags = (post._embedded?.['wp:term']?.[1] || []).map(tag => ({
+        // Enhanced: Process tags with images
+        // Tags: do not attempt to fetch or attach images (tags list does not have pictures)
+        const tagsRaw = post._embedded?.['wp:term']?.[1] || [];
+        const tags = tagsRaw.map(tag => ({
             id: tag.slug,
             name: tag.name,
             slug: tag.slug,
             count: tag.count || 0,
-            url: tag.link
+            description: tag.description || ''
         }));
 
-        // Format actors with full metadata
-        const actors = (post._embedded?.['wp:term']?.[2] || []).map(actor => ({
-            id: actor.slug,
-            name: actor.name,
-            slug: actor.slug,
-            count: actor.count || 0,
-            url: actor.link
-        }));
+        // Enhanced: Process actors with images
+        const actorsRaw = post._embedded?.['wp:term']?.[2] || [];
+        const actors = await enhanceTaxonomyListWithImages(
+            actorsRaw.map(actor => ({
+                id: actor.slug,
+                name: actor.name,
+                slug: actor.slug,
+                count: actor.count || 0
+            })),
+            'actors'
+        );
 
-        // Format categories with full metadata
-        const categories = (post._embedded?.['wp:term']?.[0] || []).map(cat => ({
-            id: cat.slug,
-            name: cat.name,
-            slug: cat.slug,
-            count: cat.count || 0,
-            url: cat.link
-        }));
+        // Enhanced: Process categories with images
+        const categoriesRaw = post._embedded?.['wp:term']?.[0] || [];
+        const categories = await enhanceTaxonomyListWithImages(
+            categoriesRaw.map(cat => ({
+                id: cat.slug,
+                name: cat.name,
+                slug: cat.slug,
+                count: cat.count || 0,
+                description: cat.description || ''
+            })),
+            'categories'
+        );
 
-        // Get poster/image - try API first
         let posterUrl = extractImageFromAPI(post);
         
-        // If API failed, try fetching featured media separately
         if (!posterUrl && post._links?.['wp:featuredmedia']?.[0]?.href) {
             posterUrl = await fetchFeaturedImage(post._links['wp:featuredmedia'][0].href);
         }
 
-        // If still no image, scrape from the page
         if (!posterUrl) {
             posterUrl = await scrapeImageFromPage(`/${slug}`);
         }
 
-        // Scrape servers and related content from the page
         const servers = await scrapeServersFromPage(`/${slug}`);
         const { related_actors, related } = await scrapeRelatedContent(`/${slug}`);
 
@@ -407,7 +540,6 @@ async function getVideoList(page = 1, perPage = 10, filter = 'latest', category 
 
         let endpoint = `${API_BASE}/posts`;
         
-        // Handle category filter
         if (category) {
             const { data: categories } = await axios.get(
                 `${API_BASE}/categories?slug=${category}`, 
@@ -418,7 +550,6 @@ async function getVideoList(page = 1, perPage = 10, filter = 'latest', category 
             }
         }
         
-        // Handle tag filter
         if (tag) {
             const { data: tags } = await axios.get(
                 `${API_BASE}/tags?slug=${tag}`, 
@@ -429,7 +560,6 @@ async function getVideoList(page = 1, perPage = 10, filter = 'latest', category 
             }
         }
         
-        // Handle actor filter
         if (actor) {
             const { data: actors } = await axios.get(
                 `${API_BASE}/actors?slug=${actor}`, 
@@ -448,21 +578,12 @@ async function getVideoList(page = 1, perPage = 10, filter = 'latest', category 
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
         const totalItems = parseInt(headers['x-wp-total'] || 0);
 
-        // Process videos and get images
         const videos = await Promise.all(data.map(async post => {
-            // Try to get image from API first
             let imageUrl = extractImageFromAPI(post);
             
-            // If API failed, try fetching featured media separately
             if (!imageUrl && post._links?.['wp:featuredmedia']?.[0]?.href) {
                 imageUrl = await fetchFeaturedImage(post._links['wp:featuredmedia'][0].href);
             }
-            
-            // If still no image, scrape from page (as fallback)
-            // Note: This can be slow for lists, so only enable if needed
-            // if (!imageUrl) {
-            //     imageUrl = await scrapeImageFromPage(`/${post.slug}`);
-            // }
 
             return {
                 id: post.slug,
@@ -525,12 +646,9 @@ async function searchVideos(query, page = 1, perPage = 10) {
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
         const totalItems = parseInt(headers['x-wp-total'] || 0);
 
-        // Process videos and get images
         const videos = await Promise.all(data.map(async post => {
-            // Try to get image from API first
             let imageUrl = extractImageFromAPI(post);
             
-            // If API failed, try fetching featured media separately
             if (!imageUrl && post._links?.['wp:featuredmedia']?.[0]?.href) {
                 imageUrl = await fetchFeaturedImage(post._links['wp:featuredmedia'][0].href);
             }
@@ -590,6 +708,18 @@ async function getTags(page = 1, perPage = 100) {
 
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
 
+        // Enhanced: Add images to tags
+        const tagsWithImages = await enhanceTaxonomyListWithImages(
+            data.map(tag => ({
+                id: tag.slug,
+                name: tag.name,
+                slug: tag.slug,
+                count: tag.count || 0,
+                description: tag.description || ''
+            })),
+            'tags'
+        );
+
         return {
             success: true,
             pagination: {
@@ -599,13 +729,7 @@ async function getTags(page = 1, perPage = 100) {
                 hasNext: page < totalPages,
                 hasPrev: page > 1
             },
-            data: data.map(tag => ({
-                id: tag.slug,
-                name: tag.name,
-                slug: tag.slug,
-                count: tag.count || 0,
-                url: tag.link
-            }))
+            data: tagsWithImages
         };
     } catch (error) {
         return {
@@ -625,6 +749,19 @@ async function getCategories(page = 1, perPage = 100) {
 
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
 
+        // Enhanced: Add images to categories
+        const categoriesWithImages = await enhanceTaxonomyListWithImages(
+            data.map(cat => ({
+                id: cat.slug,
+                name: cat.name,
+                slug: cat.slug,
+                count: cat.count || 0,
+                url: cat.link,
+                description: cat.description || ''
+            })),
+            'categories'
+        );
+
         return {
             success: true,
             pagination: {
@@ -634,13 +771,7 @@ async function getCategories(page = 1, perPage = 100) {
                 hasNext: page < totalPages,
                 hasPrev: page > 1
             },
-            data: data.map(cat => ({
-                id: cat.slug,
-                name: cat.name,
-                slug: cat.slug,
-                count: cat.count || 0,
-                url: cat.link
-            }))
+            data: categoriesWithImages
         };
     } catch (error) {
         return {
@@ -654,11 +785,23 @@ async function getCategories(page = 1, perPage = 100) {
 async function getActors(page = 1, perPage = 100) {
     try {
         const { data, headers } = await axios.get(
-            `${API_BASE}/actors?slug=${slug}&per_page=${perPage}`, 
+            `${API_BASE}/actors?page=${page}&per_page=${perPage}`, 
             axiosConfig
         );
 
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
+
+        // Enhanced: Add images to actors
+        const actorsWithImages = await enhanceTaxonomyListWithImages(
+            data.map(actor => ({
+                id: actor.slug,
+                name: actor.name,
+                slug: actor.slug,
+                count: actor.count || 0,
+                description: actor.description || ''
+            })),
+            'actors'
+        );
 
         return {
             success: true,
@@ -669,13 +812,7 @@ async function getActors(page = 1, perPage = 100) {
                 hasNext: page < totalPages,
                 hasPrev: page > 1
             },
-            data: data.map(actor => ({
-                id: actor.slug,
-                name: actor.name,
-                slug: actor.slug,
-                count: actor.count || 0,
-                url: actor.link
-            }))
+            data: actorsWithImages
         };
     } catch (error) {
         return {
@@ -730,7 +867,6 @@ async function getPageInfo(type, identifier = null, page = 1, filter = 'latest')
 // ==================== EXPORTS ====================
 
 module.exports = {
-    // Main functions
     getVideoDetails,
     getVideoList,
     searchVideos,
@@ -751,4 +887,8 @@ module.exports = {
     getPostsByCategory: (category, page, perPage) => getVideoList(page, perPage || 10, 'latest', category),
     getPostsByTag: (tag, page, perPage) => getVideoList(page, perPage || 10, 'latest', null, tag),
     getPostsByActor: (actor, page, perPage) => getVideoList(page, perPage || 10, 'latest', null, null, actor),
+    
+    // Utility functions for direct access
+    clearImageCache: () => imageCache.clear(),
+    getImageCacheSize: () => imageCache.size,
 };
