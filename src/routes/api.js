@@ -184,10 +184,25 @@ router.get('/jav/tsunami/actors', (req, res) => {
     handleResponse(res, javtsunami.getActors(page, perPage));
 });
 
-// Browse by actor
+// Search actors using query string: /jav/tsunami/actors/search?q=name&page=1&per_page=50&images=true
+router.get('/jav/tsunami/actors/search', (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ status: 'error', message: 'Missing query parameter ?q=' });
+    const page = parseInt(req.query.page, 10) || 1;
+    const perPage = parseInt(req.query.per_page, 10) || 100;
+    const includeImages = String(req.query.images || '').toLowerCase() === 'true';
+    handleResponse(res, javtsunami.searchActors(q, page, perPage, includeImages));
+});
+
+// Browse by actor - FIXED VERSION
+// Use getPostsByActor instead of scrapeTag since actors are a separate taxonomy
 router.get('/jav/tsunami/actor/:actor/:page?', (req, res) => {
+    const actor = req.params.actor;
     const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
-    handleResponse(res, javtsunami.getPostsByTag(req.params.actor, page, 10));
+    const perPage = 20;
+    
+    // Use getPostsByActor which properly filters by actor taxonomy
+    handleResponse(res, javtsunami.getPostsByActor(actor, page, perPage));
 });
 
 // Search
