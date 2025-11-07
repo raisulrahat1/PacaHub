@@ -23,6 +23,7 @@
   - [HentaiTV](#-hentaitv)
   - [HentaiCity](#-hentaicity)
   - [JavGG](#-javgg) <!-- Added -->
+  - [JAVTsunami](#-javtsunami) <!-- Added -->
 - [Supported Providers](#-supported-providers)
 - [Examples](#-examples)
 - [Contributing](#-contributing)
@@ -135,6 +136,23 @@ The API will be available at `http://localhost:3000`.
 | `/api/jav/javgg/maker-list` | Get all makers | None |
 | `/api/jav/javgg/maker/:id/:page?` | Get movies by maker | `id`: Maker ID<br>`page`: Page number (optional) |
 
+### 🌊 JAVTsunami
+
+| Endpoint | Description | Parameters |
+|----------|-------------|------------|
+| `/api/jav/tsunami/latest/:page?` | Get latest videos | `page`: Page number (optional)<br>`filter`: Sort order (optional) |
+| `/api/jav/tsunami/featured/:page?` | Get featured videos | `page`: Page number (optional)<br>`filter`: Sort order (optional) |
+| `/api/jav/tsunami/categories` | Get all categories | None |
+| `/api/jav/tsunami/category/:category/:page?` | Get videos by category | `category`: Category name<br>`page`: Page number (optional)<br>`filter`: Sort order (optional) |
+| `/api/jav/tsunami/watch/:id` | Get video sources | `id`: Video ID |
+| `/api/jav/tsunami/tags` | Get all tags | None |
+| `/api/jav/tsunami/tag/:tag/:page?` | Get videos by tag | `tag`: Tag name<br>`page`: Page number (optional)<br>`filter`: Sort order (optional) |
+| `/api/jav/tsunami/actors` | Get all actors | `page`: Page number (optional)<br>`per_page`: Results per page (optional) |
+| `/api/jav/tsunami/actors/search` | Search actors | `q`: Search query<br>`page`: Page number (optional)<br>`per_page`: Results per page (optional)<br>`images`: Include images (boolean, optional) |
+| `/api/jav/tsunami/actor/:actor/:page?` | Get videos by actor | `actor`: Actor ID<br>`page`: Page number (optional) |
+| `/api/jav/tsunami/search` | Search videos | `q`: Search query<br>`page`: Page number (optional) |
+| `/api/jav/tsunami/random` | Get random video | None |
+
 For more detailed information and examples, visit the `/docs` endpoint in the API.
 
 ---
@@ -150,7 +168,8 @@ PacaHub currently integrates with the following content sources:
 | 📖 **MangaKakalot** | ✅ Running | Manga | Search, Latest, Popular, Details, Read |
 | 🎥 **HentaiTV** | ✅ Running | Adult Videos | Search, Random, Recent, Trending, Watch, Info, Genre |
 | 🔞 **HentaiCity** | ✅ Running | Adult Videos | Recent, Popular |
-| 🎬 **JavGG** | ✅ Running | JAV | Recent, Featured, Trending, Random, Search, Info, Genre, Actress, Tag, Maker | <!-- Added -->
+| 🎬 **JavGG** | ✅ Running | JAV | Recent, Featured, Trending, Random, Search, Info, Genre, Actress, Tag, Maker |
+| 🌊 **JAVTsunami** | ✅ Running | JAV | Latest, Featured, Categories, Tags, Actors, Search, Random |
 
 </div>
 
