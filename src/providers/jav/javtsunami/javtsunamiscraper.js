@@ -5,13 +5,53 @@ const { enhanceServerWithMedia } = require('../../../utils/iframe/turbovidhls');
 const BASE_URL = 'https://javtsunami.com';
 const API_BASE = `${BASE_URL}/wp-json/wp/v2`;
 
-// Configure axios defaults
+// Configure axios defaults with shorter timeout
 const axiosConfig = {
     headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     },
-    timeout: 15000
+    timeout: 8000 // Reduced from 15000
 };
+
+// ==================== ENHANCED CACHING SYSTEM ====================
+
+class LRUCache {
+    constructor(maxSize = 500) {
+        this.cache = new Map();
+        this.maxSize = maxSize;
+    }
+
+    get(key) {
+        if (!this.cache.has(key)) return null;
+        const value = this.cache.get(key);
+        // Move to end (most recently used)
+        this.cache.delete(key);
+        this.cache.set(key, value);
+        return value;
+    }
+
+    set(key, value) {
+        if (this.cache.has(key)) {
+            this.cache.delete(key);
+        } else if (this.cache.size >= this.maxSize) {
+            // Remove oldest (first) entry
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+        }
+        this.cache.set(key, value);
+    }
+
+    clear() {
+        this.cache.clear();
+    }
+
+    get size() {
+        return this.cache.size;
+    }
+}
+
+const imageCache = new LRUCache(500);
+const taxonomyCache = new LRUCache(200);
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -122,12 +162,12 @@ function extractSubtitleLanguages(tags) {
     return [...new Set(languages)];
 }
 
-// ==================== IMPROVED TAXONOMY IMAGE EXTRACTION ====================
+// ==================== OPTIMIZED IMAGE EXTRACTION ====================
 
 /**
- * Extract image from taxonomy term page using multiple strategies
+ * Fast image extraction with timeout and fallback
  */
-async function scrapeTaxonomyImage(taxonomyType, slug) {
+async function scrapeTaxonomyImageOptimized(taxonomyType, slug) {
     const urlMap = {
         'actors': `${BASE_URL}/actor/${slug}`,
         'categories': `${BASE_URL}/category/${slug}`,
@@ -137,96 +177,99 @@ async function scrapeTaxonomyImage(taxonomyType, slug) {
     const url = urlMap[taxonomyType] || `${BASE_URL}/${taxonomyType}/${slug}`;
     
     try {
-        const { data } = await axios.get(url, axiosConfig);
+        // Use shorter timeout for scraping
+        const { data } = await axios.get(url, { 
+            ...axiosConfig, 
+            timeout: 5000 // 5 seconds max
+        });
         const $ = cheerio.load(data);
         
-        // Strategy 1: Open Graph image (most reliable)
+        // Strategy 1: Open Graph image (fastest)
         let image = $('meta[property="og:image"]').attr('content');
         if (image && !image.includes('Best%2BJAV%2BActors.jpg')) {
             return cleanURL(image);
         }
         
-        // Strategy 2: Twitter card image
-        image = $('meta[name="twitter:image"]').attr('content');
-        if (image && !image.includes('Best%2BJAV%2BActors.jpg')) {
-            return cleanURL(image);
-        }
-        
-        // Strategy 3: First article thumbnail (actor's latest video)
+        // Strategy 2: First article thumbnail (most reliable for actors)
         const firstArticle = $('article.thumb-block').first();
         if (firstArticle.length) {
             image = firstArticle.find('img').attr('data-src') || 
-                    firstArticle.find('img').attr('src') ||
-                    firstArticle.find('img').attr('data-lazy-src');
+                    firstArticle.find('img').attr('src');
             
-            // Validate it's not a placeholder
             if (image && !image.includes('px.gif') && !image.includes('placeholder')) {
-                return cleanURL(image);
-            }
-        }
-        
-        // Strategy 4: Schema.org ImageObject
-        const schemaScript = $('script[type="application/ld+json"]').first().html();
-        if (schemaScript) {
-            try {
-                const schema = JSON.parse(schemaScript);
-                if (schema['@graph']) {
-                    const imageObj = schema['@graph'].find(item => item['@type'] === 'ImageObject');
-                    if (imageObj?.url && !imageObj.url.includes('Best%2BJAV%2BActors.jpg')) {
-                        return cleanURL(imageObj.url);
-                    }
-                }
-            } catch (e) {
-                // Schema parsing failed, continue to next strategy
-            }
-        }
-        
-        // Strategy 5: Any visible content images (last resort)
-        const contentImages = $('.site-content img, .entry-content img, article img');
-        for (let i = 0; i < Math.min(contentImages.length, 3); i++) {
-            const $img = contentImages.eq(i);
-            image = $img.attr('data-src') || $img.attr('src') || $img.attr('data-lazy-src');
-            
-            if (image && 
-                !image.includes('px.gif') && 
-                !image.includes('placeholder') &&
-                !image.includes('Best%2BJAV%2BActors.jpg') &&
-                !image.includes('logo') &&
-                !image.includes('icon')) {
                 return cleanURL(image);
             }
         }
         
         return null;
     } catch (error) {
-        console.error(`Error scraping ${taxonomyType} image for ${slug}:`, error.message);
+        // Silently fail - don't log to avoid spam
         return null;
     }
 }
 
 /**
- * Enhance taxonomy term with image - with better caching
+ * Controlled concurrency promise executor
  */
-const imageCache = new Map();
+async function processConcurrently(items, processor, concurrency = 3) {
+    const results = [];
+    const executing = [];
+    
+    for (const item of items) {
+        const promise = processor(item).then(result => {
+            executing.splice(executing.indexOf(promise), 1);
+            return result;
+        });
+        
+        results.push(promise);
+        executing.push(promise);
+        
+        if (executing.length >= concurrency) {
+            await Promise.race(executing);
+        }
+    }
+    
+    return Promise.all(results);
+}
 
-async function enhanceTaxonomyWithImage(term, taxonomyType) {
+/**
+ * OPTIMIZED: Enhanced taxonomy with lazy image loading
+ */
+async function enhanceTaxonomyWithImage(term, taxonomyType, fetchImages = false) {
     if (!term || !term.slug) return term;
+    
+    const baseTerm = {
+        id: term.id || term.slug,
+        name: term.name,
+        slug: term.slug,
+        count: term.count || 0,
+        thumbnail: null // Default to null
+    };
+    // Do not include description for actors
+    if (taxonomyType !== 'actors') {
+        baseTerm.description = term.description || '';
+    }
+    
+    // If not fetching images, return immediately
+    if (!fetchImages) {
+        return baseTerm;
+    }
     
     const cacheKey = `${taxonomyType}:${term.slug}`;
     
     // Check cache first
-    if (imageCache.has(cacheKey)) {
-        const cachedImage = imageCache.get(cacheKey);
+    const cached = imageCache.get(cacheKey);
+    if (cached !== null) {
         return {
-            ...term,
-            thumbnail: cachedImage
+            ...baseTerm,
+            thumbnail: cached
         };
     }
     
     try {
         let imageUrl = null;
         
-        // Try to extract from description HTML if present
+        // Try to extract from description HTML if present (fastest)
         if (term.description) {
             const imgMatch = term.description.match(/<img[^>]+src="([^">]+)"/);
             if (imgMatch && imgMatch[1] && !imgMatch[1].includes('Best%2BJAV%2BActors.jpg')) {
@@ -234,48 +277,53 @@ async function enhanceTaxonomyWithImage(term, taxonomyType) {
             }
         }
         
-        // If no image found in description, scrape the taxonomy page
+        // Only scrape if no image found and explicitly requested
         if (!imageUrl) {
-            imageUrl = await scrapeTaxonomyImage(taxonomyType, term.slug);
+            imageUrl = await scrapeTaxonomyImageOptimized(taxonomyType, term.slug);
         }
         
-        // Cache the result (even if null)
+        // Cache even null results to avoid re-fetching
         imageCache.set(cacheKey, imageUrl);
         
         return {
-            ...term,
+            ...baseTerm,
             thumbnail: imageUrl
         };
     } catch (error) {
-        console.error(`Error enhancing ${taxonomyType} term:`, error.message);
-        return term;
+        return baseTerm;
     }
 }
 
 /**
- * Enhance multiple taxonomy terms with images - with controlled concurrency
+ * OPTIMIZED: Batch enhance with controlled concurrency
  */
-async function enhanceTaxonomyListWithImages(terms, taxonomyType) {
+async function enhanceTaxonomyListWithImages(terms, taxonomyType, fetchImages = false) {
     if (!Array.isArray(terms) || terms.length === 0) return terms;
     
-    // Process in smaller batches to avoid overwhelming the server
-    const batchSize = 3;
-    const results = [];
-    
-    for (let i = 0; i < terms.length; i += batchSize) {
-        const batch = terms.slice(i, i + batchSize);
-        const enhancedBatch = await Promise.all(
-            batch.map(term => enhanceTaxonomyWithImage(term, taxonomyType))
-        );
-        results.push(...enhancedBatch);
-        
-        // Small delay between batches to be respectful
-        if (i + batchSize < terms.length) {
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
+    // If not fetching images, return basic data immediately
+    if (!fetchImages) {
+        return terms.map(term => {
+            const base = {
+                id: term.id || term.slug,
+                name: term.name,
+                slug: term.slug,
+                count: term.count || 0,
+                thumbnail: null
+            };
+            // Omit description for actors
+            if (taxonomyType !== 'actors') {
+                base.description = term.description || '';
+            }
+            return base;
+        });
     }
     
-    return results;
+    // Process with concurrency limit of 5
+    return processConcurrently(
+        terms,
+        term => enhanceTaxonomyWithImage(term, taxonomyType, true),
+        5
+    );
 }
 
 // ==================== SCRAPING FUNCTIONS ====================
@@ -403,7 +451,7 @@ async function scrapeRelatedContent(videoPath) {
     }
 }
 
-// ==================== HYBRID API + SCRAPING FUNCTIONS ====================
+// ==================== MAIN API FUNCTIONS ====================
 
 async function getVideoDetails(slug) {
     try {
@@ -422,18 +470,21 @@ async function getVideoDetails(slug) {
 
         const post = data[0];
         
-        // Enhanced: Process tags with images
-        // Tags: do not attempt to fetch or attach images (tags list does not have pictures)
+        // Process tags (now WITH images by default)
         const tagsRaw = post._embedded?.['wp:term']?.[1] || [];
-        const tags = tagsRaw.map(tag => ({
-            id: tag.slug,
-            name: tag.name,
-            slug: tag.slug,
-            count: tag.count || 0,
-            description: tag.description || ''
-        }));
+        const tags = await enhanceTaxonomyListWithImages(
+            tagsRaw.map(tag => ({
+                id: tag.slug,
+                name: tag.name,
+                slug: tag.slug,
+                count: tag.count || 0,
+                description: tag.description || ''
+            })),
+            'tags',
+            true // Fetch images by default for detail page
+        );
 
-        // Enhanced: Process actors with images
+        // Process actors WITH images (only for detail page)
         const actorsRaw = post._embedded?.['wp:term']?.[2] || [];
         const actors = await enhanceTaxonomyListWithImages(
             actorsRaw.map(actor => ({
@@ -442,10 +493,11 @@ async function getVideoDetails(slug) {
                 slug: actor.slug,
                 count: actor.count || 0
             })),
-            'actors'
+            'actors',
+            true // Fetch images for detail page
         );
 
-        // Enhanced: Process categories with images
+        // Process categories WITH images (only for detail page)
         const categoriesRaw = post._embedded?.['wp:term']?.[0] || [];
         const categories = await enhanceTaxonomyListWithImages(
             categoriesRaw.map(cat => ({
@@ -455,7 +507,8 @@ async function getVideoDetails(slug) {
                 count: cat.count || 0,
                 description: cat.description || ''
             })),
-            'categories'
+            'categories',
+            true // Fetch images for detail page
         );
 
         let posterUrl = extractImageFromAPI(post);
@@ -528,7 +581,7 @@ async function getVideoDetails(slug) {
     }
 }
 
-async function getVideoList(page = 1, perPage = 10, filter = 'latest', category = null, tag = null, actor = null) {
+async function getVideoList(page = 1, perPage = 20, filter = 'latest', category = null, tag = null, actor = null) {
     try {
         const params = {
             page,
@@ -629,7 +682,7 @@ async function getVideoList(page = 1, perPage = 10, filter = 'latest', category 
     }
 }
 
-async function searchVideos(query, page = 1, perPage = 10) {
+async function searchVideos(query, page = 1, perPage = 20) {
     try {
         const params = {
             page,
@@ -699,7 +752,10 @@ async function searchVideos(query, page = 1, perPage = 10) {
     }
 }
 
-async function getTags(page = 1, perPage = 100) {
+/**
+ * OPTIMIZED: Get tags without images by default
+ */
+async function getTags(page = 1, perPage = 100, includeImages = true) {
     try {
         const { data, headers } = await axios.get(
             `${API_BASE}/tags?page=${page}&per_page=${perPage}`, 
@@ -708,8 +764,8 @@ async function getTags(page = 1, perPage = 100) {
 
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
 
-        // Enhanced: Add images to tags
-        const tagsWithImages = await enhanceTaxonomyListWithImages(
+        // No images for tags by default
+        const tags = await enhanceTaxonomyListWithImages(
             data.map(tag => ({
                 id: tag.slug,
                 name: tag.name,
@@ -717,7 +773,8 @@ async function getTags(page = 1, perPage = 100) {
                 count: tag.count || 0,
                 description: tag.description || ''
             })),
-            'tags'
+            'tags',
+            includeImages
         );
 
         return {
@@ -729,7 +786,7 @@ async function getTags(page = 1, perPage = 100) {
                 hasNext: page < totalPages,
                 hasPrev: page > 1
             },
-            data: tagsWithImages
+            data: tags
         };
     } catch (error) {
         return {
@@ -740,7 +797,10 @@ async function getTags(page = 1, perPage = 100) {
     }
 }
 
-async function getCategories(page = 1, perPage = 100) {
+/**
+ * OPTIMIZED: Get categories without images by default
+ */
+async function getCategories(page = 1, perPage = 100, includeImages = true) {
     try {
         const { data, headers } = await axios.get(
             `${API_BASE}/categories?page=${page}&per_page=${perPage}`, 
@@ -749,8 +809,8 @@ async function getCategories(page = 1, perPage = 100) {
 
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
 
-        // Enhanced: Add images to categories
-        const categoriesWithImages = await enhanceTaxonomyListWithImages(
+        // Only fetch images if explicitly requested
+        const categories = await enhanceTaxonomyListWithImages(
             data.map(cat => ({
                 id: cat.slug,
                 name: cat.name,
@@ -759,7 +819,8 @@ async function getCategories(page = 1, perPage = 100) {
                 url: cat.link,
                 description: cat.description || ''
             })),
-            'categories'
+            'categories',
+            includeImages
         );
 
         return {
@@ -771,7 +832,7 @@ async function getCategories(page = 1, perPage = 100) {
                 hasNext: page < totalPages,
                 hasPrev: page > 1
             },
-            data: categoriesWithImages
+            data: categories
         };
     } catch (error) {
         return {
@@ -782,25 +843,51 @@ async function getCategories(page = 1, perPage = 100) {
     }
 }
 
-async function getActors(page = 1, perPage = 100) {
+/**
+ * OPTIMIZED: Get actors without images by default
+ */
+async function getActors(page = 1, perPage = 100, includeImages = true) {
     try {
-        const { data, headers } = await axios.get(
-            `${API_BASE}/actors?page=${page}&per_page=${perPage}`, 
+        const firstResp = await axios.get(
+            // Change perPage in the API request from 10 to 20
+            `${API_BASE}/actors?page=${page}&per_page=25`, 
             axiosConfig
         );
 
+        let { data } = firstResp;
+        const headers = firstResp.headers;
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
 
-        // Enhanced: Add images to actors
-        const actorsWithImages = await enhanceTaxonomyListWithImages(
+        // If API returned fewer items than requested, try to auto-fetch additional pages
+        if (Array.isArray(data) && data.length > 0 && data.length < 20 && totalPages > 1) {
+            // Estimate items per page returned by the API 
+            const apiPerPage = data.length;
+            const neededPages = Math.min(totalPages, Math.ceil(20 / apiPerPage));
+            const pages = [];
+            for (let p = page + 1; p <= neededPages; p++) pages.push(p);
+
+            if (pages.length) {
+                const requests = pages.map(p => axios.get(
+                    `${API_BASE}/actors?page=${p}&per_page=20`,
+                    axiosConfig
+                ).then(r => Array.isArray(r.data) ? r.data : []).catch(() => []));
+                const results = await Promise.all(requests);
+                results.forEach(arr => data = data.concat(arr));
+                // Trim to requested perPage
+                if (data.length > 20) data = data.slice(0, 20);
+            }
+        }
+
+        // Only fetch images if explicitly requested
+        const actors = await enhanceTaxonomyListWithImages(
             data.map(actor => ({
                 id: actor.slug,
                 name: actor.name,
                 slug: actor.slug,
-                count: actor.count || 0,
-                description: actor.description || ''
+                count: actor.count || 0
             })),
-            'actors'
+            'actors',
+            includeImages
         );
 
         return {
@@ -812,7 +899,7 @@ async function getActors(page = 1, perPage = 100) {
                 hasNext: page < totalPages,
                 hasPrev: page > 1
             },
-            data: actorsWithImages
+            data: actors
         };
     } catch (error) {
         return {
@@ -877,18 +964,27 @@ module.exports = {
     
     // Backward compatibility aliases
     scrapeWatch: (slug) => getVideoDetails(slug.replace('/watch/', '').replace('.html', '')),
-    scrapeLatest: (page, filter) => getVideoList(page, 10, filter),
-    scrapeFeatured: (page, filter) => getVideoList(page, 10, filter, 'featured'),
-    scrapeCategory: (category, page, filter) => getVideoList(page, 10, filter, category),
-    scrapeTag: (tag, page, filter) => getVideoList(page, 10, filter, null, tag),
+    scrapeLatest: (page, filter) => getVideoList(page, 20, filter),
+    scrapeFeatured: (page, filter) => getVideoList(page, 20, filter, 'featured'),
+    scrapeCategory: (category, page, filter) => getVideoList(page, 20, filter, category),
+    scrapeTag: (tag, page, filter) => getVideoList(page, 20, filter, null, tag),
     scrapeSearch: (query, page) => searchVideos(query, page),
-    scrapeTagList: () => getTags(),
-    scrapeCategoryPage: (category, page, filter) => getVideoList(page, 10, filter, category),
-    getPostsByCategory: (category, page, perPage) => getVideoList(page, perPage || 10, 'latest', category),
-    getPostsByTag: (tag, page, perPage) => getVideoList(page, perPage || 10, 'latest', null, tag),
-    getPostsByActor: (actor, page, perPage) => getVideoList(page, perPage || 10, 'latest', null, null, actor),
+    scrapeTagList: (includeImages = false) => getTags(1, 100, includeImages),
+    scrapeCategoryPage: (category, page, filter) => getVideoList(page, 20, filter, category),
+    getPostsByCategory: (category, page, perPage) => getVideoList(page, perPage || 20, 'latest', category),
+    getPostsByTag: (tag, page, perPage) => getVideoList(page, perPage || 20, 'latest', null, tag),
+    getPostsByActor: (actor, page, perPage) => getVideoList(page, perPage || 20, 'latest', null, null, actor),
     
     // Utility functions for direct access
-    clearImageCache: () => imageCache.clear(),
+    clearImageCache: () => {
+        imageCache.clear();
+        taxonomyCache.clear();
+    },
     getImageCacheSize: () => imageCache.size,
+    getTaxonomyCacheSize: () => taxonomyCache.size,
+    
+    // New optimized methods with explicit image control
+    getActorsWithImages: (page = 1, perPage = 100) => getActors(page, perPage, true),
+    getCategoriesWithImages: (page = 1, perPage = 100) => getCategories(page, perPage, true),
+    getTagsWithImages: (page = 1, perPage = 100) => getTags(page, perPage, true),
 };
