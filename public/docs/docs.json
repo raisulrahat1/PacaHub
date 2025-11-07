@@ -102,11 +102,19 @@
                 "name": "JavTsunami",
                 "url": "https://javtsunami.com",
                 "endpoint": [
-                    "/api/jav/tsunami/featured?page={page}&filter={filter}",
-                    "/api/jav/tsunami/category/:category?page={page}&filter={filter}",
+                    "/api/jav/tsunami/latest/:page?filter={filter}",
+                    "/api/jav/tsunami/featured/:page?filter={filter}",
+                    "/api/jav/tsunami/categories",
+                    "/api/jav/tsunami/category/:category/:page?filter={filter}",
                     "/api/jav/tsunami/watch/:id",
+                    "/api/jav/tsunami/tags",
                     "/api/jav/tsunami/tag-list",
-                    "/api/jav/tsunami/tag/:tag?page={page}&filter={filter}"
+                    "/api/jav/tsunami/tag/:tag/:page?filter={filter}",
+                    "/api/jav/tsunami/actors?page={page}&per_page={perPage}",
+                    "/api/jav/tsunami/actors/search?q={query}&page={page}&per_page={perPage}&images={boolean}",
+                    "/api/jav/tsunami/actor/:actor/:page?",
+                    "/api/jav/tsunami/search?q={query}&page={page}",
+                    "/api/jav/tsunami/random"
                 ]
             }
         ]
