@@ -846,35 +846,42 @@ async function getCategories(page = 1, perPage = 100, includeImages = true) {
 /**
  * OPTIMIZED: Get actors without images by default
  */
-async function getActors(page = 1, perPage = 100, includeImages = true) {
+async function getActors(page = 1, perPage = 20, includeImages = true, search = null) {
     try {
-        const firstResp = await axios.get(
-            // Change perPage in the API request from 10 to 20
-            `${API_BASE}/actors?page=${page}&per_page=25`, 
+        // Build query params for actors endpoint, include search when provided
+        const params = {
+            page,
+            per_page: perPage,
+        };
+        if (search) params.search = search;
+        
+        const resp = await axios.get(
+            `${API_BASE}/actors?${buildQuery(params)}`, 
             axiosConfig
         );
 
-        let { data } = firstResp;
-        const headers = firstResp.headers;
+        let { data } = resp;
+        const headers = resp.headers;
         const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
 
-        // If API returned fewer items than requested, try to auto-fetch additional pages
-        if (Array.isArray(data) && data.length > 0 && data.length < 20 && totalPages > 1) {
-            // Estimate items per page returned by the API 
-            const apiPerPage = data.length;
-            const neededPages = Math.min(totalPages, Math.ceil(20 / apiPerPage));
-            const pages = [];
-            for (let p = page + 1; p <= neededPages; p++) pages.push(p);
-
-            if (pages.length) {
-                const requests = pages.map(p => axios.get(
-                    `${API_BASE}/actors?page=${p}&per_page=20`,
+        // If API returned fewer items than requested and there are more pages,
+        // try to fetch additional pages until we have perPage items or run out.
+        if (Array.isArray(data) && data.length > 0 && data.length < perPage && totalPages > page) {
+            const needed = perPage - data.length;
+            const pagesToFetch = [];
+            let p = page + 1;
+            while (p <= totalPages && pagesToFetch.length * perPage < needed) {
+                pagesToFetch.push(p);
+                p++;
+            }
+            if (pagesToFetch.length) {
+                const requests = pagesToFetch.map(pnum => axios.get(
+                    `${API_BASE}/actors?${buildQuery({ page: pnum, per_page: perPage, ...(search ? { search } : {}) })}`,
                     axiosConfig
                 ).then(r => Array.isArray(r.data) ? r.data : []).catch(() => []));
                 const results = await Promise.all(requests);
                 results.forEach(arr => data = data.concat(arr));
-                // Trim to requested perPage
-                if (data.length > 20) data = data.slice(0, 20);
+                if (data.length > perPage) data = data.slice(0, perPage);
             }
         }
 
@@ -984,7 +991,10 @@ module.exports = {
     getTaxonomyCacheSize: () => taxonomyCache.size,
     
     // New optimized methods with explicit image control
-    getActorsWithImages: (page = 1, perPage = 100) => getActors(page, perPage, true),
+    getActorsWithImages: (page = 1, perPage = 20, search = null) => getActors(page, perPage, true, search),
     getCategoriesWithImages: (page = 1, perPage = 100) => getCategories(page, perPage, true),
     getTagsWithImages: (page = 1, perPage = 100) => getTags(page, perPage, true),
+
+    // Actor search helper
+    searchActors: (query, page = 1, perPage = 20, includeImages = false) => getActors(page, perPage, includeImages, query)
 };
