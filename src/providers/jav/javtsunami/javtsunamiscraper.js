@@ -995,6 +995,6 @@ module.exports = {
     getCategoriesWithImages: (page = 1, perPage = 100) => getCategories(page, perPage, true),
     getTagsWithImages: (page = 1, perPage = 100) => getTags(page, perPage, true),
 
-    // Actor search helper
-    searchActors: (query, page = 1, perPage = 20, includeImages = false) => getActors(page, perPage, includeImages, query)
+    // Actor search helper - also with images by default
+    searchActors: (query, page = 1, perPage = 20, includeImages = true) => getActors(page, perPage, includeImages, query)
 };
