@@ -757,21 +757,28 @@ async function searchVideos(query, page = 1, perPage = 20) {
  */
 async function getTags(page = 1, perPage = 100, includeImages = true) {
     try {
-        const { data, headers } = await axios.get(
-            `${API_BASE}/tags?page=${page}&per_page=${perPage}`, 
-            axiosConfig
-        );
+        let allTags = [];
+        let totalPages = 1;
 
-        const totalPages = parseInt(headers['x-wp-totalpages'] || 1);
+        do {
+            const { data, headers } = await axios.get(
+                `${API_BASE}/tags?page=${page}&per_page=${perPage}`, 
+                axiosConfig
+            );
 
-        // No images for tags by default
+            totalPages = parseInt(headers['x-wp-totalpages'] || 1);
+            allTags = allTags.concat(data);
+            page++;
+        } while (page <= totalPages);
+
+        // Only fetch images if explicitly requested
         const tags = await enhanceTaxonomyListWithImages(
-            data.map(tag => ({
+            allTags.map(tag => ({
                 id: tag.slug,
                 name: tag.name,
                 slug: tag.slug,
-                count: tag.count || 0,
-                description: tag.description || ''
+                count: tag.count || 0
+                // Removed "thumbnail" and "description" for faster processing
             })),
             'tags',
             includeImages
@@ -780,10 +787,10 @@ async function getTags(page = 1, perPage = 100, includeImages = true) {
         return {
             success: true,
             pagination: {
-                currentPage: page,
+                currentPage: page - 1,
                 perPage,
                 totalPages,
-                hasNext: page < totalPages,
+                hasNext: page <= totalPages,
                 hasPrev: page > 1
             },
             data: tags
@@ -844,7 +851,7 @@ async function getCategories(page = 1, perPage = 100, includeImages = true) {
 }
 
 /**
- * OPTIMIZED: Get actors without images by default
+ * OPTIMIZED: Get actors with images by default
  */
 async function getActors(page = 1, perPage = 20, includeImages = true, search = null) {
     try {
@@ -885,7 +892,7 @@ async function getActors(page = 1, perPage = 20, includeImages = true, search = 
             }
         }
 
-        // Only fetch images if explicitly requested
+        // Always fetch images by default for actors
         const actors = await enhanceTaxonomyListWithImages(
             data.map(actor => ({
                 id: actor.slug,
@@ -894,7 +901,7 @@ async function getActors(page = 1, perPage = 20, includeImages = true, search = 
                 count: actor.count || 0
             })),
             'actors',
-            includeImages
+            true  // Changed to true - always fetch images by default
         );
 
         return {
