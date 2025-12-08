@@ -15,6 +15,19 @@
                     "/api/manga/kakalot/popular-now",
                     "/api/manga/kakalot/home"
                 ]
+            },
+            {
+                "name": "Hentai20",
+                "url": "https://hentai20.io",
+                "endpoint": [
+                    "/api/manga/h20/details/:slug",
+                    "/api/manga/h20/popular",
+                    "/api/manga/h20/search?q=query&page=1&per_page=20",
+                    "/api/manga/h20/read/:slug",
+                    "/api/manga/h20/genres",
+                    "/api/manga/h20/genre/:genre/:page?",
+                    "/api/manga/h20/cache/clear"
+                ]
             }
         ]
     },
@@ -31,7 +44,9 @@
                     "/api/hen/tv/recent",
                     "/api/hen/tv/trending",
                     "/api/hen/tv/random",
-                    "/api/hen/tv/brand/:brand"
+                    "/api/hen/tv/brand/:brand/:page?",
+                    "/api/hen/tv/brand-list",
+                    "/api/hen/tv/genre-list"
                 ]
             },
             {
