@@ -8,6 +8,9 @@ const javggvidlink = require('../providers/jav/javgg/javggvidlink');
 const hentaimama = require('../providers/hentai/hentaimama');
 const { hentaimamaSearch } = require('../providers/hentai/hentaimama');
 const javtsunami = require('../providers/jav/javtsunami/javtsunamiscraper');
+const { Hentai20 } = require('../providers/manga/hentai20/hentai20'); // Import new scraper
+
+const hentai20 = new Hentai20(); // Instantiate the new scraper
 
 // Helper function to handle responses with error handling
 const handleResponse = (res, promise) => {
@@ -52,6 +55,33 @@ router.get('/', (req, res) => {
                     'GET /api/hen/tv/search/:query/:page?',
                     'GET /api/hen/tv/genre/:genre/:page?',
                     'GET /api/hen/tv/brand/:brand/:page?'
+                ]
+            },
+            hentai20: { // Add hentai20 documentation
+                browse: [
+                    'GET /api/manga/h20/latest/:page?',
+                    'GET /api/manga/h20/popular/:page?',
+                    'GET /api/manga/h20/updated/:page?',
+                    'GET /api/manga/h20/random'
+                ],
+                content: [
+                    'GET /api/manga/h20/details/:slug',
+                    'GET /api/manga/h20/chapter/:slug',
+                    'GET /api/manga/h20/read/:slug',
+                    'GET /api/manga/h20/read-first/:slug'
+                ],
+                taxonomies: [
+                    'GET /api/manga/h20/tags?page=1&per_page=100',
+                    'GET /api/manga/h20/categories?page=1&per_page=100',
+                    'GET /api/manga/h20/tag/:tag/:page?',
+                    'GET /api/manga/h20/category/:category/:page?'
+                ],
+                search: [
+                    'GET /api/manga/h20/search?q=query&page=1'
+                ],
+                cache: [
+                    'POST /api/manga/h20/cache/clear',
+                    'GET /api/manga/h20/cache/stats'
                 ]
             }
         }
@@ -183,146 +213,103 @@ router.get("/manga/kakalot/completed/:page?", mangakakalot.getCompletedMangas);
 router.get("/manga/kakalot/popular-now", mangakakalot.getPopularNowMangas);
 router.get("/manga/kakalot/home", mangakakalot.getHomePage);
 
-// ===== JavGG Endpoints =====
+// ===== Hentai20 Endpoints =====
 
-router.get('/jav/javgg/recent/:page?', (req, res) => {
-    handleResponse(res, javgg.scrapeJavggRecent(req.params.page || 1));
+router.get('/manga/h20/details/:slug', (req, res) => {
+    handleResponse(res, hentai20.getMangaDetails(req.params.slug));
 });
 
-router.get('/jav/javgg/featured/:page?', (req, res) => {
-    handleResponse(res, javgg.scrapeJavggFeatured(req.params.page || 1));
-});
+router.get('/manga/h20/popular', (req, res) => {
+    const perPage = Math.min(parseInt(req.query.per_page, 10) || 20, 100);
 
-router.get('/jav/javgg/trending/:page?', (req, res) => {
-    handleResponse(res, javgg.scrapeJavggTrending(req.params.page || 1));
-});
-
-router.get('/jav/javgg/random/:page?', (req, res) => {
-    handleResponse(res, javgg.scrapeJavggRandom(req.params.page || 1));
-});
-
-router.get('/jav/javgg/search/:query/:page?', (req, res) => {
-    handleResponse(res, javgg.scrapeSearch(req.params.query, req.params.page || 1));
-});
-
-router.get('/jav/javgg/info/:id', (req, res) => {
-    handleResponse(res, javgg.scrapeJavDetails(req.params.id));
-});
-
-router.get('/jav/javgg/servers/:id', (req, res) => {
-    handleResponse(res, javgg.scrapeJavServers(req.params.id));
-});
-
-router.get('/jav/javgg/watch/:id', (req, res) => {
-    handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.query.server));
-});
-
-router.get('/jav/javgg/watch/:id/:server', (req, res) => {
-    handleResponse(res, javggvidlink.scrapeJavVid(req.params.id, req.params.server));
-});
-
-router.get('/jav/javgg/genre/:genre/:page?', (req, res) => {
-    handleResponse(res, javgg.scrapeJavGenre(req.params.genre, req.params.page || 1));
-});
-
-router.get('/jav/javgg/genre-list', (req, res) => {
-    handleResponse(res, javgg.scrapeJavGenres());
-});
-
-router.get('/jav/javgg/star-list', (req, res) => {
-    handleResponse(res, javgg.scrapeJavStars());
-});
-
-router.get('/jav/javgg/top-actress', (req, res) => {
-    handleResponse(res, javgg.scrapeJavTopActress());
-});
-
-router.get('/jav/javgg/star/:id/:page?', (req, res) => {
-    handleResponse(
-        res,
-        javgg.scrapeJavStar(req.params.id, req.params.page ? parseInt(req.params.page, 10) : 1)
-    );
-});
-
-router.get('/jav/javgg/tag-list', (req, res) => {
-    handleResponse(res, javgg.scrapeJavTags());
-});
-
-router.get('/jav/javgg/tag/:tag/:page?', (req, res) => {
-    handleResponse(
-        res,
-        javgg.scrapeJavTag(req.params.tag, req.params.page ? parseInt(req.params.page, 10) : 1)
-    );
-});
-
-router.get('/jav/javgg/maker-list', (req, res) => {
-    handleResponse(res, javgg.scrapeJavMakers());
-});
-
-router.get('/jav/javgg/maker/:id/:page?', (req, res) => {
-    handleResponse(
-        res,
-        javgg.scrapeJavMaker(req.params.id, req.params.page ? parseInt(req.params.page, 10) : 1)
-    );
-});
-
-// ===== HentaiMama Endpoints =====
-
-router.get('/hen/mama/home', (req, res) => {
-    handleResponse(res, hentaimama.scrapeHome());
-});
-
-router.get('/hen/mama/info/:id', (req, res) => {
-    handleResponse(res, hentaimama.scrapeInfo(req.params.id));
-});
-
-router.get('/hen/mama/episode/:id', (req, res) => {
-    handleResponse(res, hentaimama.scrapeEpisode(req.params.id));
-});
-
-router.get('/hen/mama/series/:page?', (req, res) => {
-    handleResponse(
-        res,
-        hentaimama.scrapeSeries(
-            req.params.page ? parseInt(req.params.page, 10) : 1,
-            req.query.filter
-        )
-    );
-});
-
-router.get('/hen/mama/genre-list', (req, res) => {
-    handleResponse(res, hentaimama.scrapeGenreList());
-});
-
-router.get('/hen/mama/genre/:genre/page/:page', (req, res) => {
-    handleResponse(
-        res,
-        hentaimama.scrapeGenrePage(req.params.genre, parseInt(req.params.page, 10) || 1)
-    );
-});
-
-router.get('/hen/mama/genre/:genre', (req, res) => {
-    handleResponse(
-        res,
-        hentaimama.scrapeGenrePage(
-            req.params.genre,
-            parseInt(req.query.page, 10) || 1
-        )
-    );
-});
-
-router.get('/hen/mama/search', async (req, res) => {
-    const q = req.query.q || '';
-    const page = parseInt(req.query.page || '1', 10);
-    
-    if (!q) {
-        return res.status(400).json({ 
-            status: 'error',
-            message: 'Missing query parameter ?q=' 
+    const transform = (items = []) => {
+        return (items || []).map(it => {
+            const link = it.link || '';
+            const parts = String(link).split('/').filter(Boolean);
+            const slug = parts.length ? parts.pop() : null;
+            const { link: _ignore, excerpt: _ignore2, datePublished: _ignore3, ...rest } = it;
+            return { ...rest, slug };
         });
+    };
+
+    handleResponse(res, hentai20.getPopularPeriods(perPage).then(result => {
+        return {
+            weekly: transform(result.weekly),
+            monthly: transform(result.monthly),
+            all: transform(result.all)
+        };
+    }));
+});
+
+router.get('/manga/h20/search', (req, res) => {
+    const query = req.query.q || req.query.query;
+    const page = parseInt(req.query.page, 10) || 1;
+    const perPage = Math.min(parseInt(req.query.per_page, 10) || 20, 100);
+    if (!query) {
+        return res.status(400).json({ status: 'error', message: 'Missing query parameter. Use ?q=searchterm' });
     }
-    
-    handleResponse(res, hentaimamaSearch(q, page));
+
+    const transform = (items = []) => {
+        return (items || []).map(it => {
+            const link = it.link || '';
+            const parts = String(link).split('/').filter(Boolean);
+            const slug = parts.length ? parts.pop() : null;
+            const { link: _ignore, excerpt: _ignore2, datePublished: _ignore3, ...rest } = it;
+            return { ...rest, slug };
+        });
+    };
+
+    handleResponse(res, hentai20.searchManga(query, page, perPage).then(result => {
+        return {
+            items: transform(result.items),
+            totalPages: result.totalPages,
+            currentPage: result.currentPage,
+            perPage: perPage
+        };
+    }));
+});
+
+router.get('/manga/h20/read/:slug', (req, res) => {
+    handleResponse(res, hentai20.getChapterImages('https://hentai20.io/' + req.params.slug));
+});
+
+router.post('/manga/h20/cache/clear', (req, res) => {
+    try {
+        hentai20.clearCaches();
+        res.json({ status: 'success', message: 'Hentai20 cache cleared successfully' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+router.get('/manga/h20/genres', (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
+    handleResponse(res, hentai20.getGenres(limit));
+});
+
+router.get('/manga/h20/genre/:genre/:page?', (req, res) => {
+    const genre = req.params.genre;
+    const page = parseInt(req.params.page || req.query.page, 10) || 1;
+    const perPage = Math.min(parseInt(req.query.per_page, 10) || 20, 100);
+
+    const transform = (items = []) => {
+        return (items || []).map(it => {
+            const link = it.link || '';
+            const parts = String(link).split('/').filter(Boolean);
+            const slug = parts.length ? parts.pop() : null;
+            const { link: _ignore, excerpt: _ignore2, datePublished: _ignore3, ...rest } = it;
+            return { ...rest, slug };
+        });
+    };
+
+    handleResponse(res, hentai20.getMangaByGenre(genre, page, perPage).then(result => {
+        return {
+            items: transform(result.items),
+            totalPages: result.totalPages,
+            currentPage: result.currentPage,
+            perPage: perPage
+        };
+    }));
 });
 
 // ===== JAVTsunami Endpoints =====
@@ -364,35 +351,38 @@ router.get('/jav/tsunami/tag/:tag/:page?', (req, res) => {
     handleResponse(res, javtsunami.scrapeTag(req.params.tag, page, filter));
 });
 
-router.get('/jav/tsunami/actors', (req, res) => {
-    const page = parseInt(req.query.page, 10) || 1;
-    const perPage = parseInt(req.query.per_page, 10) || 100;
-    handleResponse(res, javtsunami.getActors(page, perPage));
-});
-
+// Search actors with query parameter
 router.get('/jav/tsunami/actors/search', (req, res) => {
-    const q = (req.query.q || '').trim();
+    const query = (req.query.q || req.query.search || '').trim();
     
-    if (!q) {
+    if (!query) {
         return res.status(400).json({ 
             status: 'error', 
-            message: 'Missing query parameter ?q=' 
+            message: 'Missing search query. Use ?q=searchterm or ?search=searchterm' 
         });
     }
     
     const page = parseInt(req.query.page, 10) || 1;
-    const perPage = parseInt(req.query.per_page, 10) || 100;
-    const includeImages = String(req.query.images || '').toLowerCase() === 'true';
+    const perPage = parseInt(req.query.per_page, 10) || 20;
+    const includeImages = req.query.images === 'true' || req.query.images === '1';
     
-    handleResponse(res, javtsunami.searchActors(q, page, perPage, includeImages));
+    handleResponse(res, javtsunami.searchActors(query, page, perPage, includeImages));
 });
 
-router.get('/jav/tsunami/actor/:actor/:page?', (req, res) => {
-    const actor = req.params.actor;
-    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
-    const perPage = 20;
+// Get all actors (with optional search parameter)
+router.get('/jav/tsunami/actors', (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const perPage = parseInt(req.query.per_page, 10) || 20;
+    const includeImages = req.query.images === 'true' || req.query.images === '1';
+    const search = (req.query.q || req.query.search || '').trim() || null;
     
-    handleResponse(res, javtsunami.getPostsByActor(actor, page, perPage));
+    if (search) {
+        // If search query provided, use search
+        handleResponse(res, javtsunami.searchActors(search, page, perPage, includeImages));
+    } else {
+        // Otherwise get all actors
+        handleResponse(res, javtsunami.getActors(page, perPage, includeImages));
+    }
 });
 
 router.get('/jav/tsunami/search', (req, res) => {
@@ -419,16 +409,6 @@ router.get('/jav/tsunami/random', (req, res) => {
             throw new Error('No videos found');
         })
     );
-});
-
-// Health check endpoint
-router.get('/health', (req, res) => {
-    res.json({
-        status: 'success',
-        message: 'API is healthy',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime()
-    });
 });
 
 module.exports = router;
