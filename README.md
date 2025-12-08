@@ -19,13 +19,15 @@
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [API Documentation](#-api-documentation)
+  - [Hentai20](#-hentai20)
   - [MangaKakalot](#-mangakakalot)
   - [HentaiTV](#-hentaitv)
   - [HentaiCity](#-hentaicity)
-  - [JavGG](#-javgg) <!-- Added -->
-  - [JAVTsunami](#-javtsunami) <!-- Added -->
+  - [HentaiMama](#-hentaimama)
+  - [JavGG](#-javgg)
+  - [JAVTsunami](#-javtsunami)
 - [Supported Providers](#-supported-providers)
-- [Examples](#-examples)
+- [Usage Examples](#-usage-examples)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -79,6 +81,106 @@ The API will be available at `http://localhost:3000`.
 
 ## 📚 API Documentation
 
+### 📖 Hentai20
+
+| Endpoint | Description | Parameters |
+|----------|-------------|------------|
+| `/api/manga/h20/details/:slug` | Get manga details | `slug`: Manga slug |
+| `/api/manga/h20/popular` | Get popular manga by period | `per_page`: Items per page (optional, max 100, default 20) |
+| `/api/manga/h20/search` | Search manga | `q` or `query`: Search term (required)<br>`page`: Page number (optional, default 1)<br>`per_page`: Items per page (optional, max 100, default 20) |
+| `/api/manga/h20/read/:slug` | Get chapter images | `slug`: Chapter slug |
+| `/api/manga/h20/genres` | Get all genres | `limit`: Max genres to return (optional, max 200, default 100) |
+| `/api/manga/h20/genre/:genre/:page?` | Get manga by genre | `genre`: Genre slug<br>`page`: Page number (optional, default 1)<br>`per_page`: Items per page (optional, max 100, default 20) |
+| `/api/manga/h20/cache/clear` | Clear cache | POST request |
+
+**Hentai20 Response Format:**
+
+Get Popular (All Periods):
+```bash
+GET /api/manga/h20/popular?per_page=20
+```
+
+Response structure:
+```json
+{
+  "status": "success",
+  "data": {
+    "weekly": [ { "id": null, "title": "...", "slug": "...", "featuredImageUrl": "..." } ],
+    "monthly": [ { "id": null, "title": "...", "slug": "...", "featuredImageUrl": "..." } ],
+    "all": [ { "id": null, "title": "...", "slug": "...", "featuredImageUrl": "..." } ]
+  }
+}
+```
+
+Search Manga:
+```bash
+GET /api/manga/h20/search?q=query&page=1&per_page=20
+```
+
+Response structure:
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [ { "id": null, "title": "...", "slug": "...", "featuredImageUrl": "..." } ],
+    "totalPages": 10,
+    "currentPage": 1,
+    "perPage": 20
+  }
+}
+```
+
+Get Manga by Genre:
+```bash
+GET /api/manga/h20/genre/{genre}/1?per_page=20
+```
+
+Response structure:
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [ { "id": null, "title": "...", "slug": "...", "featuredImageUrl": "..." } ],
+    "totalPages": 24,
+    "currentPage": 1,
+    "perPage": 20
+  }
+}
+```
+
+Get Manga Details:
+```bash
+GET /api/manga/h20/details/{slug}
+```
+
+Response structure:
+```json
+{
+  "status": "success",
+  "data": {
+    "id": null,
+    "title": "...",
+    "description": "...",
+    "status": "Ongoing",
+    "type": "Webtoon",
+    "author": "...",
+    "featuredImageUrl": "...",
+    "genres": [ { "name": "...", "slug": "..." } ],
+    "chapters": [ { "number": "...", "title": "...", "slug": "..." } ],
+    "totalChapters": 50
+  }
+}
+```
+
+Get Chapter Images:
+```bash
+GET /api/manga/h20/read/{chapter-slug}
+```
+
+Response: Array of image URLs
+
+---
+
 ### 📖 MangaKakalot
 
 | Endpoint | Description | Parameters |
@@ -97,44 +199,62 @@ The API will be available at `http://localhost:3000`.
 
 | Endpoint | Description | Parameters |
 |----------|-------------|------------|
-| `/api/hen/hentaitv/search/:query/:page` | Search for videos | `query`: Search term<br>`page`: Page number (optional) |
-| `/api/hen/hentaitv/random` | Get random videos | None |
-| `/api/hen/hentaitv/recent` | Get recently added videos | None |
-| `/api/hen/hentaitv/trending` | Get trending videos | None |
-| `/api/hen/hentaitv/watch/:id` | Get video sources | `id`: Video ID |
-| `/api/hen/hentaitv/info/:id` | Get video details | `id`: Video ID |
-| `/api/hen/hentaitv/genre/:genre/:page?` | Get videos by genre | `genre`: Genre name<br>`page`: Page number (optional) |
-| `/api/hen/hentaitv/brand/:brand?page=1` | Get Studio | '?page=': Page Number (optional) |
+| `/api/hen/tv/search/:query/:page` | Search for videos | `query`: Search term<br>`page`: Page number (optional) |
+| `/api/hen/tv/random` | Get random videos | None |
+| `/api/hen/tv/recent` | Get recently added videos | None |
+| `/api/hen/tv/trending` | Get trending videos | None |
+| `/api/hen/tv/watch/:id` | Get video sources | `id`: Video ID |
+| `/api/hen/tv/info/:id` | Get video details | `id`: Video ID |
+| `/api/hen/tv/genre/:genre/:page?` | Get videos by genre | `genre`: Genre name<br>`page`: Page number (optional) |
+| `/api/hen/tv/brand/:brand/:page?` | Get videos by studio | `brand`: Studio name<br>`page`: Page number (optional) |
+| `/api/hen/tv/genre-list` | Get all genres | None |
+| `/api/hen/tv/brand-list` | Get all studios | None |
 
 ### 🔞 HentaiCity
 
 | Endpoint | Description | Parameters |
 |----------|-------------|------------|
-| `/api/hen/hentaicity/recent` | Get recently added videos | None |
-| `/api/hen/hentaicity/popular` | Get popular videos | None |
+| `/api/hen/city/info/:id` | Get video info | `id`: Video ID |
+| `/api/hen/city/watch/:id` | Get video sources | `id`: Video ID |
+| `/api/hen/city/recent` | Get recent videos | None |
+| `/api/hen/city/popular/:page?` | Get popular videos | `page`: Page number (optional) |
+| `/api/hen/city/top/:page?` | Get top videos | `page`: Page number (optional) |
+
+### 🎬 HentaiMama
+
+| Endpoint | Description | Parameters |
+|----------|-------------|------------|
+| `/api/hen/mama/home` | Get homepage content | None |
+| `/api/hen/mama/info/:id` | Get series info | `id`: Series ID |
+| `/api/hen/mama/episode/:id` | Get episode | `id`: Episode ID |
+| `/api/hen/mama/series/:page?` | Get all series | `page`: Page number (optional) |
+| `/api/hen/mama/genre-list` | Get all genres | None |
+| `/api/hen/mama/genre/:genre` | Get series by genre | `genre`: Genre name |
+| `/api/hen/mama/genre/:genre/page/:page` | Get series by genre (paginated) | `genre`: Genre name<br>`page`: Page number |
+| `/api/hen/mama/search` | Search series | `q` or `query`: Search term<br>`page`: Page number (optional) |
 
 ### 🎬 JavGG
 
 | Endpoint | Description | Parameters |
 |----------|-------------|------------|
-| `/api/jav/javgg/recent/:page?` | Get recent JAV movies | `page`: Page number (optional) |
-| `/api/jav/javgg/featured/:page?` | Get featured JAV movies | `page`: Page number (optional) |
-| `/api/jav/javgg/trending/:page?` | Get trending JAV movies | `page`: Page number (optional) |
-| `/api/jav/javgg/random/:page?` | Get random JAV movies | `page`: Page number (optional) |
-| `/api/jav/javgg/search/:query/:page?` | Search JAV movies | `query`: Search term<br>`page`: Page number (optional) |
-| `/api/jav/javgg/info/:id` | Get JAV movie details | `id`: Movie ID |
-| `/api/jav/javgg/servers/:id` | Get available servers for a movie | `id`: Movie ID |
-| `/api/jav/javgg/watch/:id` | Watch a movie | `id`: Movie ID |
-| `/api/jav/javgg/watch/:id/:server` | Watch a movie on a specific server | `id`: Movie ID<br>`server`: Server name |
-| `/api/jav/javgg/genre/:genre/:page?` | Get movies by genre | `genre`: Genre name<br>`page`: Page number (optional) |
+| `/api/jav/javgg/recent/:page?` | Get recent videos | `page`: Page number (optional) |
+| `/api/jav/javgg/featured/:page?` | Get featured videos | `page`: Page number (optional) |
+| `/api/jav/javgg/trending/:page?` | Get trending videos | `page`: Page number (optional) |
+| `/api/jav/javgg/random/:page?` | Get random videos | `page`: Page number (optional) |
+| `/api/jav/javgg/search/:query/:page?` | Search videos | `query`: Search term<br>`page`: Page number (optional) |
+| `/api/jav/javgg/info/:id` | Get video details | `id`: Video ID |
+| `/api/jav/javgg/servers/:id` | Get available servers | `id`: Video ID |
+| `/api/jav/javgg/watch/:id` | Watch a video | `id`: Video ID |
+| `/api/jav/javgg/watch/:id/:server` | Watch on specific server | `id`: Video ID<br>`server`: Server name |
+| `/api/jav/javgg/genre/:genre/:page?` | Get videos by genre | `genre`: Genre name<br>`page`: Page number (optional) |
 | `/api/jav/javgg/genre-list` | Get all genres | None |
 | `/api/jav/javgg/star-list` | Get all actresses | None |
 | `/api/jav/javgg/top-actress` | Get top actresses | None |
-| `/api/jav/javgg/star/:id/:page?` | Get movies by actress | `id`: Actress ID<br>`page`: Page number (optional) |
+| `/api/jav/javgg/star/:id/:page?` | Get videos by actress | `id`: Actress ID<br>`page`: Page number (optional) |
 | `/api/jav/javgg/tag-list` | Get all tags | None |
-| `/api/jav/javgg/tag/:tag/:page?` | Get movies by tag | `tag`: Tag name<br>`page`: Page number (optional) |
+| `/api/jav/javgg/tag/:tag/:page?` | Get videos by tag | `tag`: Tag name<br>`page`: Page number (optional) |
 | `/api/jav/javgg/maker-list` | Get all makers | None |
-| `/api/jav/javgg/maker/:id/:page?` | Get movies by maker | `id`: Maker ID<br>`page`: Page number (optional) |
+| `/api/jav/javgg/maker/:id/:page?` | Get videos by maker | `id`: Maker ID<br>`page`: Page number (optional) |
 
 ### 🌊 JAVTsunami
 
@@ -146,14 +266,13 @@ The API will be available at `http://localhost:3000`.
 | `/api/jav/tsunami/category/:category/:page?` | Get videos by category | `category`: Category name<br>`page`: Page number (optional)<br>`filter`: Sort order (optional) |
 | `/api/jav/tsunami/watch/:id` | Get video sources | `id`: Video ID |
 | `/api/jav/tsunami/tags` | Get all tags | None |
+| `/api/jav/tsunami/tag-list` | Get tag list | None |
 | `/api/jav/tsunami/tag/:tag/:page?` | Get videos by tag | `tag`: Tag name<br>`page`: Page number (optional)<br>`filter`: Sort order (optional) |
 | `/api/jav/tsunami/actors` | Get all actors | `page`: Page number (optional)<br>`per_page`: Results per page (optional) |
-| `/api/jav/tsunami/actors/search` | Search actors | `q`: Search query<br>`page`: Page number (optional)<br>`per_page`: Results per page (optional)<br>`images`: Include images (boolean, optional) |
+| `/api/jav/tsunami/actors/search` | Search actors | `q` or `search`: Search query<br>`page`: Page number (optional)<br>`per_page`: Results per page (optional)<br>`images`: Include images (optional) |
 | `/api/jav/tsunami/actor/:actor/:page?` | Get videos by actor | `actor`: Actor ID<br>`page`: Page number (optional) |
-| `/api/jav/tsunami/search` | Search videos | `q`: Search query<br>`page`: Page number (optional) |
+| `/api/jav/tsunami/search` | Search videos | `q`: Search query (required)<br>`page`: Page number (optional) |
 | `/api/jav/tsunami/random` | Get random video | None |
-
-For more detailed information and examples, visit the `/docs` endpoint in the API.
 
 ---
 
@@ -165,47 +284,68 @@ PacaHub currently integrates with the following content sources:
 
 | Provider | Status | Content Type | Features |
 |----------|--------|-------------|----------|
-| 📖 **MangaKakalot** | ✅ Running | Manga | Search, Latest, Popular, Details, Read |
-| 🎥 **HentaiTV** | ✅ Running | Adult Videos | Search, Random, Recent, Trending, Watch, Info, Genre |
-| 🔞 **HentaiCity** | ✅ Running | Adult Videos | Recent, Popular |
-| 🎬 **JavGG** | ✅ Running | JAV | Recent, Featured, Trending, Random, Search, Info, Genre, Actress, Tag, Maker |
-| 🌊 **JAVTsunami** | ✅ Running | JAV | Latest, Featured, Categories, Tags, Actors, Search, Random |
+| **Hentai20** | ✅ Active | Manga | Search, Popular, Details, Read, Genres |
+| **MangaKakalot** | ✅ Active | Manga | Search, Latest, Popular, Details, Read |
+| **HentaiTV** | ✅ Active | Adult Videos | Search, Random, Recent, Trending, Watch, Info, Genre |
+| **HentaiCity** | ✅ Active | Adult Videos | Recent, Popular, Top, Info, Watch |
+| **HentaiMama** | ✅ Active | Anime | Search, Series, Genre, Episodes, Info |
+| **JavGG** | ✅ Active | Videos | Recent, Featured, Trending, Random, Search, Info, Genre, Tags |
+| **JAVTsunami** | ✅ Active | Videos | Latest, Featured, Categories, Tags, Actors, Search, Random |
 
 </div>
 
-> **Note:** Provider statuses are subject to change based on availability.
+> **Note:** Provider statuses are subject to change based on website availability.
 
 ---
 
-## 🔍 Examples
+## 📖 Usage Examples
 
-### Search Request
-```
-GET /api/hen/hentaitv/search/girl/1
+### Search Manga
+
+```bash
+curl "http://localhost:3000/api/manga/h20/search?q=query&page=1&per_page=20"
 ```
 
-### Search Response
-```json
-{
-  "status": "success",
-  "data": {
-    "provider": "hentaitv",
-    "type": "search",
-    "results": [
-      {
-        "title": "Girls Rush Episode 2",
-        "id": "girls-rush-episode-2",
-        "image": "https://hentai.tv/wp-content/uploads/2023/09/poster_9781.jpg",
-        "views": 34601
-      },
-      ...
-    ],
-    "totalPages": 8,
-    "currentPage": 1,
-    "hasNextPage": true,
-    "totalResults": 192
-  }
-}
+### Get Popular Content (All Periods)
+
+```bash
+curl "http://localhost:3000/api/manga/h20/popular?per_page=20"
+```
+
+### Get Content by Genre
+
+```bash
+curl "http://localhost:3000/api/manga/h20/genre/{genre}/1?per_page=20"
+```
+
+### Get Available Genres
+
+```bash
+curl "http://localhost:3000/api/manga/h20/genres?limit=50"
+```
+
+### Get Content Details
+
+```bash
+curl "http://localhost:3000/api/manga/h20/details/{slug}"
+```
+
+### Read Chapter
+
+```bash
+curl "http://localhost:3000/api/manga/h20/read/{chapter-slug}"
+```
+
+### Search Videos
+
+```bash
+curl "http://localhost:3000/api/hen/tv/search/{query}/1"
+```
+
+### Get Recent Videos
+
+```bash
+curl "http://localhost:3000/api/jav/javgg/recent/1"
 ```
 
 ---
@@ -224,6 +364,12 @@ For major changes, please open an issue first to discuss what you would like to 
 
 ---
 
+## ⚠️ Legal Notice
+
+This project is for educational purposes only. Users are responsible for ensuring their use of this API complies with the terms of service and applicable laws of the websites being accessed. The developers do not endorse or encourage any illegal activity.
+
+---
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -231,5 +377,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-  <p>Made with ❤️ by your PacaLabs Team</p>
+  <p>Made with ❤️ by PacaLabs Team</p>
 </div>
