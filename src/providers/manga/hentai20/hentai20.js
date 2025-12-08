@@ -386,52 +386,93 @@ class Hentai20 {
             const response = await this.axiosInstance.get(chapterUrl, { timeout: 15000 });
             const $ = cheerio.load(response.data);
 
-            const imageUrls = new Set();
+            let imageUrls = new Set();
 
-            const imageSelectors = [
-                'div.reading-content img',
-                'div#chapter-reader img',
-                'img.wp-manga-chapter-img',
-                '#manga-pages img',
-                'img[data-src*=".jpg"]',
-                'img[data-src*=".png"]',
-                'img[data-src*=".webp"]',
-                'img[src*=".jpg"]',
-                'img[src*=".png"]',
-                'img[src*=".webp"]'
-            ].join(', ');
+            // 1. Try to extract from ts_reader.run() JavaScript call
+            const scriptText = $('script').html() || '';
+            const tsReaderMatch = scriptText.match(/ts_reader\.run\(\{[\s\S]*?"sources":\s*\[([\s\S]*?)\]\s*\}/);
+            
+            if (tsReaderMatch) {
+                try {
+                    // Extract the sources array
+                    const sourcesStr = '[' + tsReaderMatch[1] + ']';
+                    const sources = JSON.parse(sourcesStr.replace(/'/g, '"'));
+                    
+                    if (sources.length > 0 && sources[0].images) {
+                        sources[0].images.forEach(img => {
+                            const cleaned = cleanURL(img);
+                            if (cleaned) imageUrls.add(cleaned);
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse ts_reader sources:', e.message);
+                }
+            }
 
-            $(imageSelectors).each((_, el) => {
-                const src = $(el).attr('data-src') || $(el).attr('src');
-                if (!src) return;
-                const cleaned = cleanURL(src);
-                if (!cleaned) return;
-                const lower = cleaned.toLowerCase();
-                if (lower.includes('readerarea.svg') || lower.includes('loading.gif') || lower.includes('placeholder') || lower.includes('1x1.png')) return;
-                if (!(lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp'))) return;
-                imageUrls.add(cleaned);
-            });
+            // 2. Try noscript fallback
+            if (imageUrls.size === 0) {
+                const noscript = $('noscript').html();
+                if (noscript) {
+                    const noscriptRegex = /src="([^"]+\.jpg)"/g;
+                    let match;
+                    while ((match = noscriptRegex.exec(noscript)) !== null) {
+                        const cleaned = cleanURL(match[1]);
+                        if (cleaned) imageUrls.add(cleaned);
+                    }
+                }
+            }
 
-            // Search inline scripts for image URLs
-            const allScriptText = $('script').map((i, s) => $(s).html()).get().join(' ');
-            const urlMatches = allScriptText.match(/https?:\/\/[^\s"'()\\]+?\.(?:jpe?g|jpeg|png|webp|gif)/gi) || [];
-            for (const m of urlMatches) {
-                imageUrls.add(m);
+            // 3. Try standard image selectors
+            if (imageUrls.size === 0) {
+                const imageSelectors = [
+                    'div.reading-content img',
+                    'div.chapter-content img',
+                    'div#readerarea img',
+                    'img.wp-manga-chapter-img',
+                    'img.ts-post-image',
+                    'img[data-src]',
+                    'img'
+                ].join(', ');
+
+                $(imageSelectors).each((_, el) => {
+                    const $img = $(el);
+                    const src = $img.attr('data-lazy-src') || $img.attr('data-src') || $img.attr('src');
+                    if (!src) return;
+                    
+                    const cleaned = cleanURL(src);
+                    if (!cleaned) return;
+                    
+                    const lower = cleaned.toLowerCase();
+                    if (lower.includes('readerarea.svg') || lower.includes('loading.gif') || 
+                        lower.includes('placeholder') || lower.includes('1x1.png') ||
+                        lower.includes('logo') || lower.includes('banner')) return;
+                    
+                    if (!(lower.endsWith('.jpg') || lower.endsWith('.jpeg') || 
+                          lower.endsWith('.png') || lower.endsWith('.webp'))) return;
+                    
+                    imageUrls.add(cleaned);
+                });
             }
 
             let results = Array.from(imageUrls);
 
-            // Fallback: synthesize URLs if nothing found
+            // 4. Fallback: synthesize URLs
             if (results.length === 0) {
                 const canonical = $('link[rel="canonical"]').attr('href') || chapterUrl;
                 const parts = (canonical || chapterUrl).split('/').filter(Boolean);
                 const chapterSlug = parts.pop();
-                const mangaSlug = chapterSlug?.includes('-chapter-') ? chapterSlug.split('-chapter-')[0] : parts.pop() || '';
+                const mangaSlug = chapterSlug?.includes('-chapter-') ? 
+                    chapterSlug.split('-chapter-')[0] : parts.pop() || '';
 
                 if (mangaSlug && chapterSlug) {
-                    const hosts = ['https://img.hentai1.io', 'https://img.hentai20.io', 'https://cdn.hentai20.io'];
+                    const hosts = [
+                        'https://img.hentai1.io',
+                        'https://img.hentai20.io',
+                        'https://cdn.hentai20.io'
+                    ];
+                    
                     for (const host of hosts) {
-                        for (let i = 1; i <= 20; i++) {
+                        for (let i = 1; i <= 50; i++) {
                             const num = String(i).padStart(3, '0');
                             results.push(`${host}/${mangaSlug}/${chapterSlug}/${num}.jpg`);
                         }
