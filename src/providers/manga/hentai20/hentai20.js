@@ -328,11 +328,11 @@ class Hentai20 {
                 const imgSrc = img.attr('data-src') || img.attr('src');
                 const featuredImageUrl = cleanURL(imgSrc);
 
-                const slug = link ? link.split('/').filter(x => x).pop() : null; // Derive slug
+                const slug = link ? link.split('/').filter(x => x).pop() : null;
 
-                if (title && link && slug) { // Ensure slug exists
+                if (title && link && slug) {
                     items.push({
-                        id: slug, // Use the slug as the ID
+                        id: slug,
                         title: title,
                         link: cleanURL(link),
                         excerpt: '',
@@ -344,14 +344,15 @@ class Hentai20 {
 
             // Extract total pages from pagination
             let totalPages = 1;
-            const paginationLinks = $('.pagination .page-numbers');
-            if (paginationLinks.length > 0) {
-                const lastLink = paginationLinks.last();
-                const lastText = cleanHTML(lastLink.text());
-                if (lastText && !isNaN(lastText)) {
-                    totalPages = parseInt(lastText, 10);
+            $('.pagination .page-numbers').each((idx, elem) => {
+                const pageText = cleanHTML($(elem).text());
+                const pageNum = parseInt(pageText, 10);
+                if (!isNaN(pageNum)) {
+                    if (pageNum > totalPages) {
+                        totalPages = pageNum;
+                    }
                 }
-            }
+            });
 
             if (items.length > 0) {
                 const result = {
@@ -380,7 +381,7 @@ class Hentai20 {
                     featuredImageUrl = await this.#fetchMedia(post.featured_media);
                 }
                 return {
-                    id: post.id, // API already provides ID
+                    id: post.id,
                     title: cleanHTML(post.title.rendered),
                     link: post.link,
                     excerpt: cleanHTML(post.excerpt.rendered),
@@ -389,9 +390,12 @@ class Hentai20 {
                 };
             }));
 
+            // For API fallback, we usually don't get total pages directly from a single post search
+            const apiTotalPages = response.headers['x-wp-totalpages'] ? parseInt(response.headers['x-wp-totalpages'], 10) : 1;
+            
             const result = {
                 items: posts,
-                totalPages: 1, // API doesn't provide total pages directly from this endpoint
+                totalPages: apiTotalPages,
                 currentPage: page
             };
             mangaCache.set(cacheKey, result);
@@ -535,7 +539,11 @@ class Hentai20 {
             return result;
         } catch (err) {
             console.error('Error fetching popular periods:', err.message);
-            const fallback = { weekly: [], monthly: [], all: [] };
+            const fallback = { 
+                weekly: { items: [], totalPages: 0, currentPage: 0 }, 
+                monthly: { items: [], totalPages: 0, currentPage: 0 }, 
+                all: { items: [], totalPages: 0, currentPage: 0 } 
+            };
             mangaCache.set(cacheKey, fallback);
             return fallback;
         }
@@ -573,11 +581,11 @@ class Hentai20 {
                 const imgSrc = img.attr('data-src') || img.attr('src');
                 const featuredImageUrl = cleanURL(imgSrc);
 
-                const slug = link ? link.split('/').filter(x => x).pop() : null; // Derive slug
+                const slug = link ? link.split('/').filter(x => x).pop() : null;
 
-                if (title && slug) { // Ensure slug exists
+                if (title && slug) {
                     items.push({
-                        id: slug, // Use the slug as the ID
+                        id: slug,
                         title,
                         link: link ? cleanURL(link) : null,
                         excerpt: '',
@@ -587,9 +595,14 @@ class Hentai20 {
                 }
             });
 
+            // For homepage popular sections, total pages is always 1 as there's no explicit pagination.
+            const totalPages = 1;
+            const currentPage = 1;
+
             if (items.length > 0) {
-                mangaCache.set(key, items.slice(0, limit));
-                return items.slice(0, limit);
+                const result = { items: items.slice(0, limit), totalPages, currentPage };
+                mangaCache.set(key, result);
+                return result;
             }
 
             // API fallback
@@ -609,7 +622,7 @@ class Hentai20 {
                     featuredImageUrl = await this.#fetchMedia(post.featured_media);
                 }
                 return {
-                    id: post.id, // API already provides ID
+                    id: post.id,
                     title: cleanHTML(post.title.rendered),
                     link: post.link,
                     excerpt: cleanHTML(post.excerpt.rendered),
@@ -618,12 +631,13 @@ class Hentai20 {
                 };
             }));
 
-            mangaCache.set(key, posts.slice(0, limit));
-            return posts.slice(0, limit);
+            const result = { items: posts.slice(0, limit), totalPages, currentPage };
+            mangaCache.set(key, result);
+            return result;
         } catch (error) {
             console.error(`Error fetching popular (${period}):`, error.message);
-            mangaCache.set(key, []);
-            return [];
+            mangaCache.set(key, { items: [], totalPages: 0, currentPage: 0 });
+            return { items: [], totalPages: 0, currentPage: 0 };
         }
     }
 
@@ -691,11 +705,11 @@ class Hentai20 {
                 const imgSrc = img.attr('data-src') || img.attr('src');
                 const featuredImageUrl = cleanURL(imgSrc);
 
-                const slug = link ? link.split('/').filter(x => x).pop() : null; // Derive slug
+                const slug = link ? link.split('/').filter(x => x).pop() : null;
 
-                if (title && link && slug) { // Ensure slug exists
+                if (title && link && slug) {
                     items.push({
-                        id: slug, // Use the slug as the ID
+                        id: slug,
                         title: title,
                         link: cleanURL(link),
                         excerpt: '',
@@ -707,14 +721,15 @@ class Hentai20 {
 
             // Extract total pages from pagination
             let totalPages = 1;
-            const paginationLinks = $('.pagination .page-numbers');
-            if (paginationLinks.length > 0) {
-                const lastLink = paginationLinks.last();
-                const lastText = cleanHTML(lastLink.text());
-                if (lastText && !isNaN(lastText)) {
-                    totalPages = parseInt(lastText, 10);
+            $('.pagination .page-numbers').each((idx, elem) => {
+                const pageText = cleanHTML($(elem).text());
+                const pageNum = parseInt(pageText, 10);
+                if (!isNaN(pageNum)) {
+                    if (pageNum > totalPages) {
+                        totalPages = pageNum;
+                    }
                 }
-            }
+            });
 
             const result = {
                 items,
