@@ -262,8 +262,8 @@ router.get('/manga/h20/search', (req, res) => {
     handleResponse(res, hentai20.searchManga(query, page, perPage).then(result => {
         return {
             items: transform(result.items),
-            totalPages: result.totalPages,
-            currentPage: result.currentPage,
+            totalPages: result.totalPages, // This already includes the total pages
+            currentPage: result.currentPage, // This includes the current page
             perPage: perPage
         };
     }));
