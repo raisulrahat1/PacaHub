@@ -49,7 +49,6 @@ class LRUCache {
 const mangaCache = new LRUCache(200);
 const detailsCache = new LRUCache(100);
 const mediaCache = new LRUCache(300);
-const taxonomyCache = new LRUCache(100);
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -203,7 +202,8 @@ class Hentai20 {
             });
 
             const genres = [];
-            $('div.section h3:contains("Genres")').closest('div').find('ul.genre li a, a.genre-item').each((idx, elem) => {
+            // Updated selector to target genres on the manga detail page
+            $('.seriestugenre a, .mgen a, .genres-content a').each((idx, elem) => {
                 const genreName = cleanHTML($(elem).text());
                 const genreLink = $(elem).attr('href');
                 const genreSlug = genreLink ? genreLink.split('/').filter(x => x).pop() : null;
@@ -230,8 +230,29 @@ class Hentai20 {
                 }
             });
 
+            const relatedSeries = [];
+            $('.bixbox:has(.releases h2:contains("Related Series")) .listupd .bs').each((i, el) => {
+                const $box = $(el);
+                const anchor = $box.find('.bsx a').first();
+                const link = anchor.attr('href');
+                const title = cleanHTML(anchor.attr('title') || $box.find('.bigor .tt').text());
+                const imgSrc = $box.find('.limit img').attr('src') || $box.find('.limit img').attr('data-src');
+                const latestChapterText = cleanHTML($box.find('.adds .epxs').text());
+                const latestChapter = parseFloat(latestChapterText.replace(/[^0-9.]/g, '')) || null;
+
+                if (title && link) {
+                    const slug = link.split('/').filter(x => x).pop();
+                    relatedSeries.push({
+                        title: title,
+                        slug: slug,
+                        featuredImageUrl: cleanURL(imgSrc),
+                        latestChapter: latestChapter
+                    });
+                }
+            });
+
             const mangaDetails = {
-                id: null,
+                id: identifier, // Use the slug as the ID
                 title: title,
                 description: description,
                 excerpt: description.substring(0, 200),
@@ -244,7 +265,8 @@ class Hentai20 {
                 featuredImageUrl: featuredImageUrl,
                 genres: genres,
                 chapters: chapters.sort((a, b) => parseFloat(a.number) - parseFloat(b.number)),
-                totalChapters: chapters.length
+                totalChapters: chapters.length,
+                relatedSeries: relatedSeries
             };
 
             // API support for missing data
@@ -254,7 +276,10 @@ class Hentai20 {
                 if (apiResponse.status === 200 && apiResponse.data?.length > 0) {
                     const post = apiResponse.data[0];
                     
-                    if (!mangaDetails.id) mangaDetails.id = post.id;
+                    // Prioritize API's numerical ID if available, otherwise stick to the slug
+                    if (post.id) {
+                        mangaDetails.id = post.id; 
+                    }
                     if (!mangaDetails.datePublished && post.date) mangaDetails.datePublished = post.date;
                     if (!mangaDetails.modifiedDate && post.modified) mangaDetails.modifiedDate = post.modified;
                     if (!mangaDetails.description && post.content?.rendered) {
@@ -303,9 +328,11 @@ class Hentai20 {
                 const imgSrc = img.attr('data-src') || img.attr('src');
                 const featuredImageUrl = cleanURL(imgSrc);
 
-                if (title && link) {
+                const slug = link ? link.split('/').filter(x => x).pop() : null; // Derive slug
+
+                if (title && link && slug) { // Ensure slug exists
                     items.push({
-                        id: null,
+                        id: slug, // Use the slug as the ID
                         title: title,
                         link: cleanURL(link),
                         excerpt: '',
@@ -353,7 +380,7 @@ class Hentai20 {
                     featuredImageUrl = await this.#fetchMedia(post.featured_media);
                 }
                 return {
-                    id: post.id,
+                    id: post.id, // API already provides ID
                     title: cleanHTML(post.title.rendered),
                     link: post.link,
                     excerpt: cleanHTML(post.excerpt.rendered),
@@ -364,7 +391,7 @@ class Hentai20 {
 
             const result = {
                 items: posts,
-                totalPages: 1,
+                totalPages: 1, // API doesn't provide total pages directly from this endpoint
                 currentPage: page
             };
             mangaCache.set(cacheKey, result);
@@ -546,9 +573,11 @@ class Hentai20 {
                 const imgSrc = img.attr('data-src') || img.attr('src');
                 const featuredImageUrl = cleanURL(imgSrc);
 
-                if (title) {
+                const slug = link ? link.split('/').filter(x => x).pop() : null; // Derive slug
+
+                if (title && slug) { // Ensure slug exists
                     items.push({
-                        id: null,
+                        id: slug, // Use the slug as the ID
                         title,
                         link: link ? cleanURL(link) : null,
                         excerpt: '',
@@ -580,7 +609,7 @@ class Hentai20 {
                     featuredImageUrl = await this.#fetchMedia(post.featured_media);
                 }
                 return {
-                    id: post.id,
+                    id: post.id, // API already provides ID
                     title: cleanHTML(post.title.rendered),
                     link: post.link,
                     excerpt: cleanHTML(post.excerpt.rendered),
@@ -662,9 +691,11 @@ class Hentai20 {
                 const imgSrc = img.attr('data-src') || img.attr('src');
                 const featuredImageUrl = cleanURL(imgSrc);
 
-                if (title && link) {
+                const slug = link ? link.split('/').filter(x => x).pop() : null; // Derive slug
+
+                if (title && link && slug) { // Ensure slug exists
                     items.push({
-                        id: null,
+                        id: slug, // Use the slug as the ID
                         title: title,
                         link: cleanURL(link),
                         excerpt: '',
@@ -703,7 +734,6 @@ class Hentai20 {
         mangaCache.clear();
         detailsCache.clear();
         mediaCache.clear();
-        taxonomyCache.clear();
         console.log('Hentai20 caches cleared.');
     }
 }
