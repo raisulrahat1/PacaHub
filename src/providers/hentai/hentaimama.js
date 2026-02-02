@@ -2,6 +2,54 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const BASE_URL = 'https://hentaimama.io';
 
+// Helper: sleep
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper: safe GET with retries and sensible headers
+const safeGet = async (url, options = {}, retries = 3, backoff = 500) => {
+    const opts = Object.assign({}, options);
+    opts.headers = Object.assign({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    }, opts.headers || {});
+
+    try {
+        return await axios.get(url, opts);
+    } catch (err) {
+        const shouldRetry = retries > 0 && (
+            !err.response || err.code === 'ECONNRESET' || (err.response && err.response.status >= 500)
+        );
+        if (shouldRetry) {
+            await sleep(backoff);
+            return safeGet(url, options, retries - 1, backoff * 2);
+        }
+        throw err;
+    }
+};
+
+// Helper: safe POST with retries (form data common for ajax endpoints)
+const safePost = async (url, data, options = {}, retries = 2, backoff = 400) => {
+    const opts = Object.assign({}, options);
+    opts.headers = Object.assign({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Content-Type': opts.headers && opts.headers['Content-Type'] ? opts.headers['Content-Type'] : 'application/x-www-form-urlencoded'
+    }, opts.headers || {});
+
+    try {
+        return await axios.post(url, data, opts);
+    } catch (err) {
+        const shouldRetry = retries > 0 && (
+            !err.response || err.code === 'ECONNRESET' || (err.response && err.response.status >= 500)
+        );
+        if (shouldRetry) {
+            await sleep(backoff);
+            return safePost(url, data, options, retries - 1, backoff * 2);
+        }
+        throw err;
+    }
+};
+
 // Helper to extract slug from URL
 const extractSlug = (url) => {
     if (!url) return null;
@@ -9,8 +57,20 @@ const extractSlug = (url) => {
     return match ? match[1] : null;
 };
 
+// Validate image URL (exclude data URIs and tiny placeholders)
+const isValidImageUrl = (url) => {
+    if (!url) return false;
+    const u = String(url).trim();
+    if (u === '') return false;
+    // Exclude data URIs (base64 placeholders) and common 1x1 gif placeholder
+    if (/^data:/i.test(u)) return false;
+    if (/R0lGODlhAQABAAAA/i.test(u)) return false;
+    return true;
+};
+
 const scrapeHome = async () => {
-    const { data } = await axios.get(BASE_URL);
+    const response = await safeGet(BASE_URL);
+    const data = response.data;
     const $ = cheerio.load(data);
 
     // Slider (featured)
@@ -113,8 +173,20 @@ const scrapeHome = async () => {
 
 const scrapeInfo = async (id) => {
     const url = `${BASE_URL}/tvshows/${id}/`;
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
+    try {
+        const response = await safeGet(url, { validateStatus: () => true });
+        
+        // Check if page was found
+        if (response.status === 404 || response.data.includes('Page not found')) {
+            throw new Error(`Series not found: ${id} (404)`);
+        }
+        
+        if (response.status !== 200) {
+            throw new Error(`Failed to fetch series: HTTP ${response.status}`);
+        }
+        
+        const data = response.data;
+        const $ = cheerio.load(data);
 
     // Title & poster
     const title = $('.sheader .data h1').first().text().trim();
@@ -230,12 +302,28 @@ const scrapeInfo = async (id) => {
             similarSeries
         }
     };
+    } catch (error) {
+        console.error(`Error scraping series info for ${id}:`, error.message);
+        throw error;
+    }
 };
 
 const scrapeEpisode = async (id) => {
     const url = `${BASE_URL}/episodes/${id}/`;
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
+    try {
+        const response = await safeGet(url, { validateStatus: () => true });
+        
+        // Check if page was found
+        if (response.status === 404 || response.data.includes('Page not found')) {
+            throw new Error(`Episode not found: ${id} (404)`);
+        }
+        
+        if (response.status !== 200) {
+            throw new Error(`Failed to fetch episode: HTTP ${response.status}`);
+        }
+        
+        const data = response.data;
+        const $ = cheerio.load(data);
 
     // Title
     const title = $('h1.epih1').first().text().trim();
@@ -248,7 +336,7 @@ const scrapeEpisode = async (id) => {
     const galleryImages = [];
     $('#dt_galery .g-item img').each((i, el) => {
         const imageUrl = $(el).attr('src') || $(el).attr('data-src');
-        if (imageUrl) galleryImages.push(imageUrl.trim());
+        if (isValidImageUrl(imageUrl)) galleryImages.push(imageUrl.trim());
     });
 
     // Genres
@@ -344,6 +432,7 @@ const scrapeEpisode = async (id) => {
         const iframeList = extractIframeSources(data);
         if (iframeList.length > 0) {
             const sources = [];
+            // serverMap: serverName -> { iframes: [], mp4s: [], others: [] }
             const serverMap = new Map();
             
             for (const iframe of iframeList) {
@@ -358,9 +447,12 @@ const scrapeEpisode = async (id) => {
                 
                 // Add to server map
                 if (!serverMap.has(serverName)) {
-                    serverMap.set(serverName, []);
+                    serverMap.set(serverName, { iframes: [], mp4s: [], others: [] });
                 }
-                serverMap.get(serverName).push(sourceEntry);
+                const bucket = serverMap.get(serverName);
+                if (sourceEntry.type === 'iframe') bucket.iframes.push(sourceEntry);
+                else if (sourceEntry.type === 'mp4') bucket.mp4s.push(sourceEntry);
+                else bucket.others.push(sourceEntry);
                 
                 // Try to extract MP4 from iframe
                 try {
@@ -373,7 +465,9 @@ const scrapeEpisode = async (id) => {
                             extractedFrom: 'iframe'
                         };
                         sources.push(mp4Entry);
-                        serverMap.get(serverName).push(mp4Entry);
+                        const bucket = serverMap.get(serverName) || { iframes: [], mp4s: [], others: [] };
+                        bucket.mp4s.push(mp4Entry);
+                        serverMap.set(serverName, bucket);
                     }
                 } catch (e) {
                     console.debug('Could not extract MP4 from iframe:', iframe.src);
@@ -381,9 +475,11 @@ const scrapeEpisode = async (id) => {
             }
 
             videoSources = sources;
-            videoServers = Array.from(serverMap.entries()).map(([serverName, sources]) => ({
+            videoServers = Array.from(serverMap.entries()).map(([serverName, buckets]) => ({
                 serverName,
-                sources
+                iframeSources: buckets.iframes || [],
+                mp4Sources: buckets.mp4s || [],
+                otherSources: buckets.others || []
             }));
         }
     }
@@ -411,6 +507,10 @@ const scrapeEpisode = async (id) => {
             }
         }
     };
+    } catch (error) {
+        console.error(`Error scraping episode ${id}:`, error.message);
+        throw error;
+    }
 };
 
 /**
@@ -438,7 +538,8 @@ const scrapeSeries = async (page = 1, filter) => {
             : `${BASE_URL}/hentai-series/page/${page}/`;
     }
 
-    const { data } = await axios.get(url);
+    const response = await safeGet(url);
+    const data = response.data;
     const $ = cheerio.load(data);
 
     const results = [];
@@ -506,12 +607,91 @@ const scrapeSeries = async (page = 1, filter) => {
 };
 
 /**
+ * Scrape the Hentai Series listing page (/hentai-series/)
+ * @param {number} [page=1]
+ * @param {string} [filter] - Filter type: 'weekly', 'monthly', 'alltime', 'alphabet'
+ * @returns {Promise<Object>}
+ */
+const scrapeHentaiSeries = async (page = 1, filter) => {
+    let url;
+    const filterMap = {
+        weekly: 'weekly',
+        monthly: 'monthly',
+        alltime: 'alltime',
+        alphabet: 'alphabet'
+    };
+
+    if (filter && filterMap[filter]) {
+        url = `${BASE_URL}/hentai-series/?sort=${filterMap[filter]}${page > 1 ? `&page=${page}` : ''}`;
+    } else {
+        url = `${BASE_URL}/hentai-series${page > 1 ? `/page/${page}/` : '/'}`;
+    }
+
+    const response = await safeGet(url);
+    const data = response.data;
+    const $ = cheerio.load(data);
+
+    const results = [];
+    $('.items article.item').each((i, el) => {
+        const $el = $(el);
+        const title = $el.find('.data h3 a').text().trim() || $el.find('.data h3').text().trim();
+        const itemUrl = $el.find('.data h3 a').attr('href') || $el.find('a').first().attr('href');
+        const slug = extractSlug(itemUrl);
+        const image = $el.find('img').attr('data-src') || $el.find('img').attr('src') || null;
+        const year = $el.find('.data span').first().text().trim() || null;
+        const rating = ($el.find('.rating').text().replace(/[^0-9.]/g, '').trim()) || null;
+
+        if (title && slug) {
+            results.push({
+                id: slug,
+                title,
+                url: itemUrl,
+                slug,
+                image,
+                year,
+                rating
+            });
+        }
+    });
+
+    // Pagination
+    let totalPages = 1;
+    const $pagination = $('.pagination');
+    if ($pagination.length) {
+        $pagination.find('a, span').each((i, el) => {
+            const txt = $(el).text().trim();
+            if (/^\d+$/.test(txt)) {
+                totalPages = Math.max(totalPages, parseInt(txt, 10));
+            }
+        });
+    }
+
+    return {
+        provider: 'hentaimama',
+        type: 'hentai-series',
+        data: {
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
+            },
+            filters: {
+                applied: filter || null
+            }
+        }
+    };
+};
+
+/**
  * Scrape all genres from the genres filter page, returning slugs.
  * @returns {Promise<Object>}
  */
 const scrapeGenreList = async () => {
     const url = `${BASE_URL}/genres-filter/`;
-    const { data } = await axios.get(url);
+    const response = await safeGet(url);
+    const data = response.data;
     const $ = cheerio.load(data);
 
     const genresMap = new Map();
@@ -554,7 +734,8 @@ const scrapeGenreList = async () => {
  */
 const scrapeStudioList = async () => {
     const url = `${BASE_URL}/advance-search/`;
-    const { data } = await axios.get(url);
+    const resp = await safeGet(url);
+    const data = resp.data;
     const $ = cheerio.load(data);
 
     const studiosMap = new Map();
@@ -667,7 +848,8 @@ const advanceSearch = async (filters = {}) => {
     }
 
     try {
-        const { data } = await axios.get(url);
+        const response = await safeGet(url);
+        const data = response.data;
         const $ = cheerio.load(data);
 
         const results = [];
@@ -759,7 +941,8 @@ const advanceSearch = async (filters = {}) => {
  */
 const scrapeGenrePage = async (genre, page = 1) => {
     const url = `${BASE_URL}/genre/${genre}${page > 1 ? `/page/${page}/` : '/'}`;
-    const { data } = await axios.get(url);
+    const response = await safeGet(url);
+    const data = response.data;
     const $ = cheerio.load(data);
 
     const results = [];
@@ -819,7 +1002,8 @@ const searchHentaimama = async (query, page = 1) => {
     const url = page === 1
         ? `${BASE_URL}/?s=${encodeURIComponent(query)}`
         : `${BASE_URL}/page/${page}/?s=${encodeURIComponent(query)}`;
-    const { data } = await axios.get(url);
+    const response = await safeGet(url);
+    const data = response.data;
     const $ = cheerio.load(data);
 
     const results = [];
@@ -1047,7 +1231,7 @@ const getVideoSources = async (episodeId) => {
         formData.append('action', 'get_player_contents');
         formData.append('a', episodeId);
 
-        const { data } = await axios.post(
+        const response = await safePost(
             `${BASE_URL}/wp-admin/admin-ajax.php`,
             formData.toString(),
             {
@@ -1056,6 +1240,7 @@ const getVideoSources = async (episodeId) => {
                 }
             }
         );
+        const data = response.data;
 
         let playerContent;
         try {
@@ -1066,6 +1251,7 @@ const getVideoSources = async (episodeId) => {
         }
 
         const allSources = [];
+        // serverMap: serverName -> { iframes: [], mp4s: [], others: [] }
         const serverMap = new Map();
 
         if (Array.isArray(playerContent)) {
@@ -1087,9 +1273,12 @@ const getVideoSources = async (episodeId) => {
                     allSources.push(sourceEntry);
 
                     if (!serverMap.has(serverName)) {
-                        serverMap.set(serverName, []);
+                        serverMap.set(serverName, { iframes: [], mp4s: [], others: [] });
                     }
-                    serverMap.get(serverName).push(sourceEntry);
+                    const bucket = serverMap.get(serverName);
+                    if (sourceEntry.type === 'iframe') bucket.iframes.push(sourceEntry);
+                    else if (sourceEntry.type === 'mp4') bucket.mp4s.push(sourceEntry);
+                    else bucket.others.push(sourceEntry);
 
                     try {
                         const mp4Url = await extractMp4FromIframe(iframe.src);
@@ -1102,7 +1291,9 @@ const getVideoSources = async (episodeId) => {
                                 mirrorIndex
                             };
                             allSources.push(mp4Entry);
-                            serverMap.get(serverName).push(mp4Entry);
+                            const bucket = serverMap.get(serverName) || { iframes: [], mp4s: [], others: [] };
+                            bucket.mp4s.push(mp4Entry);
+                            serverMap.set(serverName, bucket);
                         }
                     } catch (e) {
                         console.debug('Could not extract MP4 from iframe:', iframe.src);
@@ -1125,9 +1316,9 @@ const getVideoSources = async (episodeId) => {
                         allSources.push(sourceEntry);
 
                         if (!serverMap.has('Direct MP4')) {
-                            serverMap.set('Direct MP4', []);
+                            serverMap.set('Direct MP4', { iframes: [], mp4s: [], others: [] });
                         }
-                        serverMap.get('Direct MP4').push(sourceEntry);
+                        serverMap.get('Direct MP4').mp4s.push(sourceEntry);
                     }
                 });
 
@@ -1144,9 +1335,9 @@ const getVideoSources = async (episodeId) => {
                         allSources.push(sourceEntry);
 
                         if (!serverMap.has('HTML5 Video')) {
-                            serverMap.set('HTML5 Video', []);
+                            serverMap.set('HTML5 Video', { iframes: [], mp4s: [], others: [] });
                         }
-                        serverMap.get('HTML5 Video').push(sourceEntry);
+                        serverMap.get('HTML5 Video').others.push(sourceEntry);
                     }
                 });
 
@@ -1173,9 +1364,12 @@ const getVideoSources = async (episodeId) => {
                                 allSources.push(sourceEntry);
 
                                 if (!serverMap.has(serverName)) {
-                                    serverMap.set(serverName, []);
+                                    serverMap.set(serverName, { iframes: [], mp4s: [], others: [] });
                                 }
-                                serverMap.get(serverName).push(sourceEntry);
+                                const bucket = serverMap.get(serverName);
+                                if (sourceEntry.type === 'iframe') bucket.iframes.push(sourceEntry);
+                                else if (sourceEntry.type === 'mp4') bucket.mp4s.push(sourceEntry);
+                                else bucket.others.push(sourceEntry);
                             }
                         });
                     }
@@ -1183,9 +1377,11 @@ const getVideoSources = async (episodeId) => {
             }
         }
 
-        const servers = Array.from(serverMap.entries()).map(([serverName, sources]) => ({
+        const servers = Array.from(serverMap.entries()).map(([serverName, buckets]) => ({
             serverName,
-            sources
+            iframeSources: buckets.iframes || [],
+            mp4Sources: buckets.mp4s || [],
+            otherSources: buckets.others || []
         }));
 
         return {
@@ -1223,11 +1419,12 @@ const extractMp4FromIframe = async (iframeUrl) => {
         const decodedPath = decodeIframeParam(iframeUrl);
         if (decodedPath) {
             try {
-                const { data } = await axios.get(iframeUrl, {
+                const resp = await safeGet(iframeUrl, {
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                     }
                 });
+                const data = resp.data;
                 
                 const patterns = [
                     /"?file"?\s*:\s*"([^"]+(?:\.mp4|\.m3u8)[^"]*)"/gi,
@@ -1255,7 +1452,8 @@ const extractMp4FromIframe = async (iframeUrl) => {
             return decodedPath;
         }
 
-        const { data } = await axios.get(iframeUrl);
+        const resp2 = await safeGet(iframeUrl);
+        const data = resp2.data;
         
         const patterns = [
             /"?file"?\s*:\s*"([^"]+\.mp4[^"]*)"/gi,
@@ -1326,7 +1524,8 @@ const extractServerName = (url) => {
  */
 const scrapeStudio = async (studio, page = 1) => {
     const url = `${BASE_URL}/studio/${studio}${page > 1 ? `/page/${page}/` : '/'}`;
-    const { data } = await axios.get(url);
+    const resp = await safeGet(url);
+    const data = resp.data;
     const $ = cheerio.load(data);
 
     const results = [];
@@ -1380,6 +1579,7 @@ module.exports = {
     scrapeInfo,
     scrapeEpisode,
     scrapeSeries,
+    scrapeHentaiSeries,
     scrapeGenreList,
     scrapeStudioList,
     scrapeStudio,
