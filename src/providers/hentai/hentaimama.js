@@ -14,65 +14,100 @@ const scrapeHome = async () => {
     const $ = cheerio.load(data);
 
     // Slider (featured)
-    const slider = [];
+    const featured = [];
     $('#slider-master article.item').each((i, el) => {
         const $el = $(el);
         const title = $el.find('.data h3.title').text().trim();
         const url = $el.find('a').first().attr('href');
         const slug = extractSlug(url);
-        const image = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const imageUrl = $el.find('img').attr('data-src') || $el.find('img').attr('src');
         const year = $el.find('.data span').first().text().trim();
         const rating = $el.find('.rating').text().replace(/[^0-9.]/g, '').trim();
-        if (title && slug) slider.push({ title, slug, image, year, rating });
+        if (title && slug) {
+            featured.push({ 
+                title, 
+                slug, 
+                imageUrl, 
+                year, 
+                rating: rating || null 
+            });
+        }
     });
 
     // Recent Uncensored
-    const uncensored = [];
+    const recentUncensored = [];
     $('#dt-episodes-uncen article.item').each((i, el) => {
         const $el = $(el);
-        const title = $el.find('.serie').text().trim();
-        const episode = $el.find('.data h3').first().text().trim();
+        const seriesTitle = $el.find('.serie').text().trim();
+        const episodeTitle = $el.find('.data h3').first().text().trim();
         const url = $el.find('a').first().attr('href');
         const slug = extractSlug(url);
-        const image = $el.find('img').attr('data-src') || $el.find('img').attr('src');
-        const date = $el.find('.data span').first().text().trim();
+        const imageUrl = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const releaseDate = $el.find('.data span').first().text().trim();
         const rating = $el.find('.rating').text().replace(/[^0-9.]/g, '').trim();
-        if (title && slug) uncensored.push({ title, episode, slug, image, date, rating });
+        if (seriesTitle && slug) {
+            recentUncensored.push({ 
+                seriesTitle, 
+                episodeTitle, 
+                slug, 
+                imageUrl, 
+                releaseDate, 
+                rating: rating || null 
+            });
+        }
     });
 
     // Recent Series
-    const series = [];
+    const recentSeries = [];
     $('#dt-tvshows article.item').each((i, el) => {
         const $el = $(el);
         const title = $el.find('.data h3 a').text().trim();
         const url = $el.find('.data h3 a').attr('href') || $el.find('a').first().attr('href');
         const slug = extractSlug(url);
-        const image = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const imageUrl = $el.find('img').attr('data-src') || $el.find('img').attr('src');
         const year = $el.find('.data span').first().text().trim();
         const rating = $el.find('.rating').text().replace(/[^0-9.]/g, '').trim();
-        if (title && slug) series.push({ title, slug, image, year, rating });
+        if (title && slug) {
+            recentSeries.push({ 
+                title, 
+                slug, 
+                imageUrl, 
+                year, 
+                rating: rating || null 
+            });
+        }
     });
 
     // Recent Episodes
-    const episodes = [];
+    const recentEpisodes = [];
     $('#dt-episodes-noslider article.item').each((i, el) => {
         const $el = $(el);
-        const title = $el.find('.serie').text().trim();
-        const episode = $el.find('.data h3').first().text().trim();
+        const seriesTitle = $el.find('.serie').text().trim();
+        const episodeTitle = $el.find('.data h3').first().text().trim();
         const url = $el.find('a').first().attr('href');
         const slug = extractSlug(url);
-        const image = $el.find('img').attr('data-src') || $el.find('img').attr('src');
-        const date = $el.find('.data span').first().text().trim();
-        if (title && slug) episodes.push({ title, episode, slug, image, date });
+        const imageUrl = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const releaseDate = $el.find('.data span').first().text().trim();
+        if (seriesTitle && slug) {
+            recentEpisodes.push({ 
+                seriesTitle, 
+                episodeTitle, 
+                slug, 
+                imageUrl, 
+                releaseDate 
+            });
+        }
     });
 
     return {
         provider: 'hentaimama',
         type: 'home',
-        slider,
-        uncensored,
-        series,
-        episodes
+        data: {
+            featured,
+            recentUncensored,
+            recentSeries,
+            recentEpisodes
+        }
     };
 };
 
@@ -83,111 +118,117 @@ const scrapeInfo = async (id) => {
 
     // Title & poster
     const title = $('.sheader .data h1').first().text().trim();
-    const poster = $('.sheader .poster img').attr('data-src') || $('.sheader .poster img').attr('src');
+    const posterUrl = $('.sheader .poster img').attr('data-src') || $('.sheader .poster img').attr('src');
 
-    // Description - try wp-content first, then look for other descriptive text
+    // Description
     let description = '';
     const wpContent = $('.wp-content p').first().text().trim();
     if (wpContent) {
         description = wpContent;
     } else {
-        // Fallback: try to get text from the data section
         description = $('.sheader .data').find('div:contains("No description")').text().trim() || '';
     }
 
     // Genres
     const genres = [];
     $('.sgeneros a').each((i, el) => {
-        genres.push($(el).text().trim());
+        const genre = $(el).text().trim();
+        if (genre) genres.push(genre);
     });
 
-    // Studio - find in custom_fields and get the value from next span.valor
-    let studio = '';
+    // Studio
+    let studio = null;
     $('.custom_fields').each((i, el) => {
         const label = $(el).find('b.variante').text().trim();
         if (label === 'Studio') {
-            studio = $(el).find('.valor .mta_series a').text().trim() || $(el).find('.valor a').first().text().trim();
+            studio = $(el).find('.valor .mta_series a').text().trim() || 
+                     $(el).find('.valor a').first().text().trim() || null;
         }
     });
 
-    // Air dates and Status - parse from custom_fields
-    let firstAirDate = '';
-    let lastAirDate = '';
-    let status = '';
-    let episodeCount = '';
+    // Air dates and Status
+    let firstAirDate = null;
+    let lastAirDate = null;
+    let status = null;
+    let totalEpisodes = null;
 
     $('.custom_fields').each((i, el) => {
         const label = $(el).find('b.variante').text().trim();
         const value = $(el).find('.valor').text().trim();
         
         if (label === 'First air date') {
-            firstAirDate = value;
+            firstAirDate = value || null;
         } else if (label === 'Last air date') {
-            lastAirDate = value;
+            lastAirDate = value || null;
         } else if (label === 'Status') {
-            status = value;
+            status = value || null;
         } else if (label === 'Episodes') {
-            episodeCount = value;
+            totalEpisodes = value || null;
         }
     });
 
-    // Episodes - from the episodes section
+    // Episodes
     const episodes = [];
     $('#episodes .items article.item, .series .items article.item').each((i, el) => {
         const $el = $(el);
-        const epTitle = $el.find('.season_m span.b').text().trim() || $el.find('.data h3').text().trim();
-        const epNumber = $el.find('.season_m span.c').text().trim() || 'Episode';
-        const epUrl = $el.find('.season_m a').attr('href') || $el.find('a').first().attr('href');
-        const epSlug = extractSlug(epUrl);
-        const epImage = $el.find('.poster img').attr('data-src') || $el.find('.poster img').attr('src');
-        const epDate = $el.find('.data span').first().text().trim();
-        const epStatus = $el.find('.ep_status span').text().trim();
-        const epRating = $el.find('.rating').text().replace(/[^0-9.]/g, '').trim();
+        const episodeTitle = $el.find('.season_m span.b').text().trim() || 
+                           $el.find('.data h3').text().trim();
+        const episodeNumber = $el.find('.season_m span.c').text().trim() || null;
+        const episodeUrl = $el.find('.season_m a').attr('href') || 
+                          $el.find('a').first().attr('href');
+        const slug = extractSlug(episodeUrl);
+        const imageUrl = $el.find('.poster img').attr('data-src') || 
+                        $el.find('.poster img').attr('src');
+        const releaseDate = $el.find('.data span').first().text().trim();
+        const episodeStatus = $el.find('.ep_status span').text().trim();
+        const rating = $el.find('.rating').text().replace(/[^0-9.]/g, '').trim();
         
-        if (epSlug && (epTitle || epNumber)) {
+        if (slug && (episodeTitle || episodeNumber)) {
             episodes.push({
-                title: epTitle,
-                number: epNumber,
-                slug: epSlug,
-                image: epImage,
-                date: epDate,
-                status: epStatus,
-                rating: epRating
+                title: episodeTitle || null,
+                number: episodeNumber,
+                slug,
+                imageUrl: imageUrl || null,
+                releaseDate: releaseDate || null,
+                status: episodeStatus || null,
+                rating: rating || null
             });
         }
     });
 
     // Similar titles
-    const similar = [];
+    const similarSeries = [];
     $('#single_relacionados article.item').each((i, el) => {
-        const simTitle = $(el).find('img').attr('alt');
-        const simUrl = $(el).find('a').attr('href');
-        const simSlug = extractSlug(simUrl);
-        const simImage = $(el).find('img').attr('data-src') || $(el).find('img').attr('src');
-        if (simTitle && simSlug) {
-            similar.push({
-                title: simTitle,
-                slug: simSlug,
-                image: simImage
+        const similarTitle = $(el).find('img').attr('alt');
+        const similarUrl = $(el).find('a').attr('href');
+        const slug = extractSlug(similarUrl);
+        const imageUrl = $(el).find('img').attr('data-src') || $(el).find('img').attr('src');
+        if (similarTitle && slug) {
+            similarSeries.push({
+                title: similarTitle,
+                slug,
+                imageUrl: imageUrl || null
             });
         }
     });
 
     return {
         provider: 'hentaimama',
-        type: 'info',
-        id,
-        title,
-        poster,
-        description,
-        genres,
-        studio,
-        firstAirDate,
-        lastAirDate,
-        status,
-        episodeCount,
-        episodes,
-        similar
+        type: 'series-info',
+        data: {
+            id,
+            title,
+            posterUrl: posterUrl || null,
+            description: description || null,
+            genres,
+            studio,
+            firstAirDate,
+            lastAirDate,
+            status,
+            totalEpisodes,
+            episodes,
+            similarSeries
+        }
     };
 };
 
@@ -200,73 +241,75 @@ const scrapeEpisode = async (id) => {
     const title = $('h1.epih1').first().text().trim();
 
     // Poster
-    const poster = $('.episode-series-img img').attr('data-src') || $('.episode-series-img img').attr('src');
+    const posterUrl = $('.episode-series-img img').attr('data-src') || 
+                     $('.episode-series-img img').attr('src');
 
     // Gallery images
-    const gallery = [];
+    const galleryImages = [];
     $('#dt_galery .g-item img').each((i, el) => {
-        const img = $(el).attr('src') || $(el).attr('data-src');
-        if (img) gallery.push(img.trim());
+        const imageUrl = $(el).attr('src') || $(el).attr('data-src');
+        if (imageUrl) galleryImages.push(imageUrl.trim());
     });
 
     // Genres
     const genres = [];
     $('.episode-series-info .sgeneros a').each((i, el) => {
-        genres.push($(el).text().trim());
+        const genre = $(el).text().trim();
+        if (genre) genres.push(genre);
     });
 
     // Studio
     const studio = $('.episode-series-info .field-header:contains("Studio")')
         .parent().next('.field-content').find('a').text().trim() ||
-        $('.episode-series-info .field-content a').first().text().trim();
+        $('.episode-series-info .field-content a').first().text().trim() || null;
 
     // Air date
     const airDate = $('.episode-series-info .field-header:contains("Aired On:")')
         .parent().next('.field-content').find('.date').text().trim() ||
-        $('.episode-series-info .field-content .date').first().text().trim();
+        $('.episode-series-info .field-content .date').first().text().trim() || null;
 
     // Rating
-    const rating = $('.starstruck-rating .dt_rating_vgs').text().trim();
-    const ratingCount = $('.starstruck-rating .rating-count').text().trim();
+    const rating = $('.starstruck-rating .dt_rating_vgs').text().trim() || null;
+    const ratingCount = $('.starstruck-rating .rating-count').text().trim() || null;
 
     // Episodes list
-    const episodes = [];
+    const relatedEpisodes = [];
     $('#serie_contenido ul.episodios li').each((i, el) => {
-        const epTitle = $(el).find('.episodiotitle a').text().trim();
-        const epUrl = $(el).find('.episodiotitle a').attr('href');
-        const epSlug = extractSlug(epUrl);
-        const epDate = $(el).find('.episodiotitle .date').text().trim();
-        const epImage = $(el).find('.imagen img').attr('data-src') || $(el).find('.imagen img').attr('src');
-        if (epSlug) {
-            episodes.push({
-                title: epTitle,
-                slug: epSlug,
-                date: epDate,
-                image: epImage
+        const episodeTitle = $(el).find('.episodiotitle a').text().trim();
+        const episodeUrl = $(el).find('.episodiotitle a').attr('href');
+        const slug = extractSlug(episodeUrl);
+        const releaseDate = $(el).find('.episodiotitle .date').text().trim();
+        const imageUrl = $(el).find('.imagen img').attr('data-src') || 
+                        $(el).find('.imagen img').attr('src');
+        if (slug) {
+            relatedEpisodes.push({
+                title: episodeTitle || null,
+                slug,
+                releaseDate: releaseDate || null,
+                imageUrl: imageUrl || null
             });
         }
     });
 
     // Similar titles
-    const similar = [];
+    const similarSeries = [];
     $('#single_relacionados article.item').each((i, el) => {
-        const simTitle = $(el).find('img').attr('alt');
-        const simUrl = $(el).find('a').attr('href');
-        const simSlug = extractSlug(simUrl);
-        const simImage = $(el).find('img').attr('data-src') || $(el).find('img').attr('src');
-        if (simSlug) {
-            similar.push({
-                title: simTitle,
-                slug: simSlug,
-                image: simImage
+        const similarTitle = $(el).find('img').attr('alt');
+        const similarUrl = $(el).find('a').attr('href');
+        const slug = extractSlug(similarUrl);
+        const imageUrl = $(el).find('img').attr('data-src') || $(el).find('img').attr('src');
+        if (slug) {
+            similarSeries.push({
+                title: similarTitle || null,
+                slug,
+                imageUrl: imageUrl || null
             });
         }
     });
 
-    // --- Video sources extraction ---
+    // Extract postId for video sources
     let postId = $('#idpost').val();
     
-    // Fallback methods to extract postId
     if (!postId) {
         const match1 = data.match(/name=["']idpost["']\s+value=["'](\d+)["']/);
         if (match1) postId = match1[1];
@@ -282,81 +325,91 @@ const scrapeEpisode = async (id) => {
         if (match3) postId = match3[1];
     }
 
-    // Extract iframe sources directly from page HTML if AJAX fails
-    let videoData = { mirrors: [], servers: [] };
+    // Extract video sources
+    let videoSources = [];
+    let videoServers = [];
     
     if (postId) {
         try {
-            videoData = await getVideoSources(postId);
+            const videoData = await getVideoSources(postId);
+            videoSources = videoData.sources || [];
+            videoServers = videoData.servers || [];
         } catch (e) {
             console.error('AJAX extraction failed:', e.message);
         }
     }
 
-    // Fallback: Extract iframes directly from the page HTML
-    if (videoData.mirrors.length === 0 && videoData.sources.length === 0) {
+    // Fallback: Extract iframes directly from page HTML
+    if (videoSources.length === 0) {
         const iframeList = extractIframeSources(data);
         if (iframeList.length > 0) {
             const sources = [];
+            const serverMap = new Map();
             
-            // Process each iframe and extract MP4
             for (const iframe of iframeList) {
                 const serverName = extractServerName(iframe.src);
-                sources.push({
+                const sourceEntry = {
                     url: iframe.src,
-                    server: serverName,
+                    serverName,
                     type: 'iframe',
                     extractionMethod: iframe.method
-                });
+                };
+                sources.push(sourceEntry);
+                
+                // Add to server map
+                if (!serverMap.has(serverName)) {
+                    serverMap.set(serverName, []);
+                }
+                serverMap.get(serverName).push(sourceEntry);
                 
                 // Try to extract MP4 from iframe
                 try {
                     const mp4Url = await extractMp4FromIframe(iframe.src);
                     if (mp4Url) {
-                        sources.push({
+                        const mp4Entry = {
                             url: mp4Url,
-                            server: serverName,
+                            serverName,
                             type: 'mp4',
                             extractedFrom: 'iframe'
-                        });
+                        };
+                        sources.push(mp4Entry);
+                        serverMap.get(serverName).push(mp4Entry);
                     }
                 } catch (e) {
                     console.debug('Could not extract MP4 from iframe:', iframe.src);
                 }
             }
 
-            videoData = {
-                mirrors: [],
-                sources: sources,
-                servers: Array.from(new Map(
-                    sources.map(s => [s.server, s])
-                ).entries()).map(([name, source]) => ({
-                    name,
-                    sources: sources.filter(s => s.server === name)
-                }))
-            };
+            videoSources = sources;
+            videoServers = Array.from(serverMap.entries()).map(([serverName, sources]) => ({
+                serverName,
+                sources
+            }));
         }
     }
-    // --- end video sources extraction ---
 
     return {
         provider: 'hentaimama',
         type: 'episode',
-        id,
-        url,
-        title,
-        poster,
-        gallery,
-        genres,
-        studio,
-        airDate,
-        rating,
-        ratingCount,
-        episodes,
-        similar,
-        sources: videoData.sources || videoData.mirrors || [],
-        servers: videoData.servers,
-        _debug: { postId: postId || 'not found' }
+        data: {
+            id,
+            url,
+            title,
+            posterUrl: posterUrl || null,
+            galleryImages,
+            genres,
+            studio,
+            airDate,
+            rating,
+            ratingCount,
+            relatedEpisodes,
+            similarSeries,
+            videoSources,
+            videoServers,
+            metadata: {
+                postId: postId || null
+            }
+        }
     };
 };
 
@@ -388,104 +441,346 @@ const scrapeSeries = async (page = 1, filter) => {
     const { data } = await axios.get(url);
     const $ = cheerio.load(data);
 
-    const series = [];
+    const results = [];
     $('.items article.item.tvshows').each((i, el) => {
         const $el = $(el);
         const title = $el.find('.data h3 a').text().trim() ||
                       $el.find('.data h3').text().trim();
-        const url = $el.find('.poster a').attr('href') ||
-                    $el.find('.data h3 a').attr('href');
-        const slug = extractSlug(url);
-        const image = $el.find('.poster img').attr('data-src') ||
-                      $el.find('.poster img').attr('src');
+        const itemUrl = $el.find('.poster a').attr('href') ||
+                       $el.find('.data h3 a').attr('href');
+        const slug = extractSlug(itemUrl);
+        const imageUrl = $el.find('.poster img').attr('data-src') ||
+                        $el.find('.poster img').attr('src');
         const year = $el.find('.data span').text().trim();
         const rating = $el.find('.rating').text().replace(/[^0-9.]/g, '').trim();
-        if (slug) series.push({ title, slug, image, year, rating });
+        if (slug) {
+            results.push({ 
+                title, 
+                slug, 
+                imageUrl: imageUrl || null, 
+                year: year || null, 
+                rating: rating || null 
+            });
+        }
     });
 
     // Pagination info
-    const pagination = {
-        current: page,
-        hasNext: $('.pagination a.arrow_pag').length > 0,
-        nextPage: null,
-        totalPages: null
-    };
-    // Try to get next page number and total pages
+    let totalPages = 1;
+    let hasNextPage = false;
+    
     const $pagination = $('.pagination');
     if ($pagination.length) {
-        const $current = $pagination.find('span.current');
-        const $pages = $pagination.find('a.inactive');
-        if ($pages.length) {
-            pagination.totalPages = parseInt($pages.last().text(), 10);
-            const $next = $pagination.find('a.arrow_pag');
-            if ($next.length) {
-                const match = $next.attr('href').match(/page\/(\d+)/);
-                if (match) {
-                    pagination.nextPage = parseInt(match[1], 10);
-                }
+        const $nextArrow = $pagination.find('a.arrow_pag');
+        if ($nextArrow.length) {
+            hasNextPage = true;
+            const nextHref = $nextArrow.attr('href');
+            const match = nextHref.match(/page\/(\d+)/);
+            if (match) {
+                totalPages = parseInt(match[1], 10);
+            }
+        } else {
+            hasNextPage = false;
+            const $visiblePages = $pagination.find('a.inactive');
+            if ($visiblePages.length) {
+                totalPages = parseInt($visiblePages.last().text().trim(), 10) || page;
             }
         }
     }
 
     return {
         provider: 'hentaimama',
-        type: 'series',
-        page,
-        series,
-        pagination
+        type: 'series-list',
+        data: {
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage,
+                hasPreviousPage: page > 1
+            },
+            filters: {
+                applied: filter || null
+            }
+        }
     };
 };
 
 /**
  * Scrape all genres from the genres filter page, returning slugs.
- * @returns {Promise<{provider: string, type: string, genres: string[]}>}
+ * @returns {Promise<Object>}
  */
 const scrapeGenreList = async () => {
     const url = `${BASE_URL}/genres-filter/`;
     const { data } = await axios.get(url);
     const $ = cheerio.load(data);
 
-    const genres = [];
+    const genresMap = new Map();
+    
     $('.textbox .boxtitle:contains("Genres")').nextAll('a.genreitem').each((i, el) => {
         let href = $(el).attr('href');
-        if (href) {
-            // Extract slug from URL, e.g. /genre/big-boobs/ => big-boobs
+        let name = $(el).text().trim();
+        if (href && name) {
             const match = href.match(/\/genre\/([^\/]+)/i);
-            if (match && match[1]) {
-                genres.push(match[1]);
+            if (match && match[1] && !genresMap.has(match[1])) {
+                genresMap.set(match[1], {
+                    slug: match[1],
+                    name: name
+                });
             }
         }
     });
 
+    const results = Array.from(genresMap.values()).map((genre, index) => ({
+        id: index + 1,
+        name: genre.name,
+        slug: genre.slug
+    }));
+
+    results.sort((a, b) => a.name.localeCompare(b.name));
+
     return {
         provider: 'hentaimama',
-        type: 'genres',
-        genres
+        type: 'genre-list',
+        data: {
+            totalCount: results.length,
+            results
+        }
     };
+};
+
+/**
+ * Scrape all studios from the advance search page, returning slugs.
+ * @returns {Promise<Object>}
+ */
+const scrapeStudioList = async () => {
+    const url = `${BASE_URL}/advance-search/`;
+    const { data } = await axios.get(url);
+    const $ = cheerio.load(data);
+
+    const studiosMap = new Map();
+    
+    // Method 1: Look for select dropdown with studios
+    $('select').each((i, selectEl) => {
+        const $select = $(selectEl);
+        const selectName = $select.attr('name') || $select.attr('id') || '';
+        
+        if (selectName.toLowerCase().includes('studio') || 
+            selectName.toLowerCase().includes('brand') ||
+            selectName.toLowerCase().includes('producer')) {
+            
+            $select.find('option').each((j, optEl) => {
+                const $opt = $(optEl);
+                const value = $opt.attr('value');
+                const text = $opt.text().trim();
+                
+                if (value && text && value !== '' && !studiosMap.has(value)) {
+                    studiosMap.set(value, {
+                        slug: value,
+                        name: text
+                    });
+                }
+            });
+        }
+    });
+
+    // Method 2: Look for hidden divs or lists with dropdown items
+    if (studiosMap.size === 0) {
+        $('[class*="dropdown"], [class*="select"], [class*="studio"]').each((i, el) => {
+            const $el = $(el);
+            $el.find('a, li, option').each((j, item) => {
+                const $item = $(item);
+                const href = $item.attr('href') || $item.attr('data-value') || $item.attr('value');
+                const text = $item.text().trim();
+                
+                if (href && text && !studiosMap.has(href)) {
+                    const match = href.match(/\/(?:brand|studio|producer)\/([^\/]+)/i);
+                    if (match && match[1]) {
+                        studiosMap.set(href, {
+                            slug: match[1],
+                            name: text
+                        });
+                    }
+                }
+            });
+        });
+    }
+
+    // Method 3: Search for all brand/studio links on the page
+    if (studiosMap.size === 0) {
+        $('a[href*="/brand/"], a[href*="/studio/"], a[href*="/producer/"]').each((i, el) => {
+            const $el = $(el);
+            const href = $el.attr('href');
+            const text = $el.text().trim();
+            
+            if (href && text && !text.includes('←') && !text.includes('→') && text.length > 0 && !studiosMap.has(href)) {
+                const match = href.match(/\/(?:brand|studio|producer)\/([^\/]+)/i);
+                if (match && match[1]) {
+                    studiosMap.set(href, {
+                        slug: match[1],
+                        name: text
+                    });
+                }
+            }
+        });
+    }
+
+    const results = Array.from(studiosMap.values()).map((studio, index) => ({
+        id: index + 1,
+        name: studio.name,
+        slug: studio.slug
+    }));
+
+    results.sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+        provider: 'hentaimama',
+        type: 'studio-list',
+        data: {
+            totalCount: results.length,
+            results
+        }
+    };
+};
+
+/**
+ * Perform advance search on Hentaimama with multiple filters.
+ * @param {Object} filters - Filter options
+ * @param {string} [filters.query] - Search query
+ * @param {string} [filters.genre] - Genre slug
+ * @param {string} [filters.studio] - Studio/brand slug
+ * @param {string} [filters.status] - Status (completed, ongoing, etc)
+ * @param {number} [filters.page=1] - Page number
+ * @returns {Promise<Object>}
+ */
+const advanceSearch = async (filters = {}) => {
+    const { query, genre, studio, status, page = 1 } = filters;
+    
+    const params = new URLSearchParams();
+    if (query) params.append('s', query);
+    if (genre) params.append('genre', genre);
+    if (studio) params.append('brand', studio);
+    if (status) params.append('status', status);
+    
+    let url = `${BASE_URL}/advance-search/?${params.toString()}`;
+    if (page > 1) {
+        url = `${BASE_URL}/advance-search/page/${page}/?${params.toString()}`;
+    }
+
+    try {
+        const { data } = await axios.get(url);
+        const $ = cheerio.load(data);
+
+        const results = [];
+        $('.items article.item').each((i, el) => {
+            const title = $(el).find('.title a').text().trim();
+            const href = $(el).find('.title a').attr('href');
+            const posterUrl = $(el).find('.poster img').attr('data-src') || 
+                            $(el).find('.poster img').attr('src');
+            const slug = href ? extractSlug(href) : null;
+            const rating = $(el).find('.rating').text().trim();
+            
+            if (slug && title) {
+                results.push({
+                    slug,
+                    title,
+                    posterUrl: posterUrl || null,
+                    rating: rating || null,
+                    url: href
+                });
+            }
+        });
+
+        // Pagination info
+        let totalPages = 1;
+        let hasNextPage = false;
+        
+        const $pagination = $('.pagination');
+        if ($pagination.length) {
+            const pageLinks = $pagination.find('a, span').map((i, el) => {
+                const text = $(el).text().trim();
+                return text === '' ? null : text;
+            }).get().filter(x => x);
+            
+            if (pageLinks.length > 0) {
+                const lastPage = pageLinks[pageLinks.length - 1];
+                totalPages = parseInt(lastPage, 10) || page;
+                hasNextPage = page < totalPages;
+            }
+        }
+
+        return {
+            provider: 'hentaimama',
+            type: 'advanced-search',
+            data: {
+                results,
+                pagination: {
+                    currentPage: page,
+                    totalPages,
+                    hasNextPage,
+                    hasPreviousPage: page > 1
+                },
+                filters: {
+                    query: query || null,
+                    genre: genre || null,
+                    studio: studio || null,
+                    status: status || null
+                }
+            }
+        };
+    } catch (error) {
+        return {
+            provider: 'hentaimama',
+            type: 'advanced-search',
+            data: {
+                results: [],
+                pagination: {
+                    currentPage: page,
+                    totalPages: 1,
+                    hasNextPage: false,
+                    hasPreviousPage: false
+                },
+                filters: {
+                    query: query || null,
+                    genre: genre || null,
+                    studio: studio || null,
+                    status: status || null
+                },
+                error: error.message
+            }
+        };
+    }
 };
 
 /**
  * Scrape a genre page with pagination.
  * @param {string} genre - Genre slug (e.g. "uncensored")
  * @param {number} page - Page number (1-based)
- * @returns {Promise<{provider: string, type: string, genre: string, page: number, totalPages: number, results: Array}>}
+ * @returns {Promise<Object>}
  */
 const scrapeGenrePage = async (genre, page = 1) => {
     const url = `${BASE_URL}/genre/${genre}${page > 1 ? `/page/${page}/` : '/'}`;
     const { data } = await axios.get(url);
     const $ = cheerio.load(data);
 
-    // Parse results
     const results = [];
     $('.items article.item').each((i, el) => {
         const $el = $(el);
         const title = $el.find('.data h3 a').text().trim();
-        const url = $el.find('.data h3 a').attr('href');
-        const slug = extractSlug(url);
-        const poster = $el.find('.poster img').attr('data-src') || $el.find('.poster img').attr('src');
+        const itemUrl = $el.find('.data h3 a').attr('href');
+        const slug = extractSlug(itemUrl);
+        const posterUrl = $el.find('.poster img').attr('data-src') || 
+                         $el.find('.poster img').attr('src');
         const year = $el.find('.data span').first().text().trim();
         const rating = $el.find('.rating').text().trim();
-        if (slug) results.push({ slug, title, poster, year, rating });
+        if (slug) {
+            results.push({ 
+                slug, 
+                title, 
+                posterUrl: posterUrl || null, 
+                year: year || null, 
+                rating: rating || null 
+            });
+        }
     });
 
     // Pagination
@@ -495,28 +790,22 @@ const scrapeGenrePage = async (genre, page = 1) => {
         if (!isNaN(num) && num > totalPages) totalPages = num;
     });
 
-    // Page existence check
-    if (results.length === 0 || page > totalPages) {
-        return {
-            provider: 'hentaimama',
-            type: 'genre',
-            genre,
-            page,
-            totalPages,
-            exists: false,
-            results: [],
-            message: `Page ${page} does not exist.`
-        };
-    }
+    const exists = results.length > 0 && page <= totalPages;
 
     return {
         provider: 'hentaimama',
         type: 'genre',
-        genre,
-        page,
-        totalPages,
-        exists: true,
-        results
+        data: {
+            genre,
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1,
+                exists
+            }
+        }
     };
 };
 
@@ -524,10 +813,9 @@ const scrapeGenrePage = async (genre, page = 1) => {
  * Search Hentaimama by query string and parse results.
  * @param {string} query
  * @param {number} [page=1]
- * @returns {Promise<{provider: string, type: string, results: Array}>}
+ * @returns {Promise<Object>}
  */
 const searchHentaimama = async (query, page = 1) => {
-    // Support both /?s= and /search/ URLs
     const url = page === 1
         ? `${BASE_URL}/?s=${encodeURIComponent(query)}`
         : `${BASE_URL}/page/${page}/?s=${encodeURIComponent(query)}`;
@@ -539,108 +827,83 @@ const searchHentaimama = async (query, page = 1) => {
         const $el = $(el);
         const $a = $el.find('.thumbnail a');
         const title = $el.find('.details .title a').text().trim();
-        const url = $a.attr('href');
-        const slug = extractSlug(url);
-        const thumb = $a.find('img').attr('src');
+        const itemUrl = $a.attr('href');
+        const slug = extractSlug(itemUrl);
+        const thumbnailUrl = $a.find('img').attr('src');
         const rating = $el.find('.meta .rating').text().replace('Rating:', '').trim() || null;
         const year = $el.find('.meta .year').text().trim() || null;
         const genres = [];
         $el.find('.sgeneros a').each((i, g) => genres.push($(g).text().trim()));
         if (title && slug) {
-            results.push({ title, slug, thumbnail: thumb, rating, year, genres });
+            results.push({ 
+                title, 
+                slug, 
+                thumbnailUrl: thumbnailUrl || null, 
+                rating, 
+                year, 
+                genres 
+            });
         }
     });
 
-    // Pagination info (optional)
-    const pagination = [];
-    $('.pagination a, .pagination span.current').each((i, el) => {
-        const $el = $(el);
-        pagination.push({
-            page: $el.text().trim(),
-            url: $el.is('a') ? $el.attr('href') : null,
-            current: $el.hasClass('current')
-        });
-    });
+    // Pagination info
+    let totalPages = 1;
+    let hasNextPage = false;
+    
+    const $pagination = $('.pagination');
+    if ($pagination.length) {
+        const $nextArrow = $pagination.find('a.arrow_pag');
+        if ($nextArrow.length) {
+            hasNextPage = true;
+            const nextHref = $nextArrow.attr('href');
+            const match = nextHref.match(/page\/(\d+)/);
+            if (match) {
+                totalPages = parseInt(match[1], 10);
+            }
+        } else {
+            hasNextPage = false;
+            const $visiblePages = $pagination.find('a.inactive');
+            if ($visiblePages.length) {
+                totalPages = parseInt($visiblePages.last().text().trim(), 10) || page;
+            }
+        }
+    }
 
     return {
         provider: 'hentaimama',
         type: 'search',
-        query,
-        page,
-        results,
-        pagination
+        data: {
+            query,
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage,
+                hasPreviousPage: page > 1
+            }
+        }
     };
 };
 
-// 1. Define the function first
-async function hentaimamaSearch(query, page = 1) {
-    // Support both /?s= and /search/ URLs
-    const url = page === 1
-        ? `${BASE_URL}/?s=${encodeURIComponent(query)}`
-        : `${BASE_URL}/page/${page}/?s=${encodeURIComponent(query)}`;
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
-
-    const results = [];
-    $('.result-item').each((i, el) => {
-        const $el = $(el);
-        const $a = $el.find('.thumbnail a');
-        const title = $el.find('.details .title a').text().trim();
-        const url = $a.attr('href');
-        const slug = extractSlug(url);
-        const thumb = $a.find('img').attr('src');
-        const rating = $el.find('.meta .rating').text().replace('Rating:', '').trim() || null;
-        const year = $el.find('.meta .year').text().trim() || null;
-        const genres = [];
-        $el.find('.sgeneros a').each((i, g) => genres.push($(g).text().trim()));
-        if (title && slug) {
-            results.push({ title, slug, thumbnail: thumb, rating, year, genres });
-        }
-    });
-
-    // Pagination info (optional)
-    const pagination = [];
-    $('.pagination a, .pagination span.current').each((i, el) => {
-        const $el = $(el);
-        pagination.push({
-            page: $el.text().trim(),
-            url: $el.is('a') ? $el.attr('href') : null,
-            current: $el.hasClass('current')
-        });
-    });
-
-    return {
-        provider: 'hentaimama',
-        type: 'search',
-        query,
-        page,
-        results,
-        pagination
-    };
-}
-
-// Extract iframe sources with multiple fallback methods
 // Filter function to validate if URL is a video source
 const isVideoSource = (url) => {
     if (!url) return false;
     
-    // Blocklist: URLs that are definitely NOT video sources
     const blocklist = [
-        /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i,  // Images
-        /\/wp-login\.php/i,                      // Login pages
-        /\/wp-admin/i,                           // Admin pages
-        /facebook\.com\/sharer/i,                // Social sharing
-        /\/(genre|studio|tag)\//i,               // Navigation pages
-        /\/episodes?\//i,                        // Episode list pages (unless it's the player)
-        /dooplay\/assets/i,                      // Theme assets
-        /flag|language/i,                        // Language flags
-        /data:image/i                            // Data URIs
+        /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i,
+        /\/wp-login\.php/i,
+        /\/wp-admin/i,
+        /facebook\.com\/sharer/i,
+        /\/(genre|studio|tag)\//i,
+        /\/episodes?\//i,
+        /dooplay\/assets/i,
+        /flag|language/i,
+        /data:image/i
     ];
     
-    // Whitelist: URLs that ARE video sources
     const whitelist = [
-        /newjav\.php/i,                          // PHP iframe
-        /new2\.php/i,                            // PHP iframe
+        /newjav\.php/i,
+        /new2\.php/i,
         /streamwish/i,
         /turbovid/i,
         /doodstream/i,
@@ -658,12 +921,10 @@ const isVideoSource = (url) => {
         /\/watch/i
     ];
     
-    // Check blocklist first
     for (const pattern of blocklist) {
         if (pattern.test(url)) return false;
     }
     
-    // Check whitelist
     for (const pattern of whitelist) {
         if (pattern.test(url)) return true;
     }
@@ -688,8 +949,7 @@ const extractIframeSources = (htmlContent) => {
         }
     });
 
-    // Method 2: Check for data attributes on any element - SKIP THIS, too many false positives
-    // Only check direct video player containers
+    // Method 2: Check for data attributes on video player containers
     $('[data-iframe-src], [data-video-src]').each((i, el) => {
         const src = $(el).attr('data-iframe-src') || $(el).attr('data-video-src');
         if (src && isVideoSource(src) && !seen.has(src)) {
@@ -701,11 +961,9 @@ const extractIframeSources = (htmlContent) => {
         }
     });
 
-    // Method 3: Search entire HTML for iframe patterns
-    // Look for newjav.php, new2.php, or similar iframe URLs
+    // Method 3: Search for PHP iframe patterns
     const bodyText = $('body').html() || htmlContent;
     
-    // Pattern for newjav.php or new2.php with base64 parameter
     const phpPattern = /(https?:\/\/[^\s"'<>]*(?:newjav\.php|new2\.php)[^\s"'<>]*)/gi;
     let match;
     while ((match = phpPattern.exec(bodyText)) !== null) {
@@ -719,7 +977,6 @@ const extractIframeSources = (htmlContent) => {
         }
     }
 
-    // Pattern for direct iframe URLs in src attributes
     const srcPattern = /src=["']([^"']*(?:newjav\.php|new2\.php)[^"']*?)["']/gi;
     while ((match = srcPattern.exec(bodyText)) !== null) {
         const url = match[1].trim();
@@ -732,15 +989,11 @@ const extractIframeSources = (htmlContent) => {
         }
     }
 
-    // Method 4: Common streaming service patterns (FILTERED)
+    // Method 4: Common streaming service patterns
     const patterns = [
-        // Streamwish, TurboVid, etc patterns
         /(https?:\/\/[^\s"'<>]*(?:streamwish|turbovid|doodstream|vidstream|mp4upload|mixdrop|fembed|xstreamcdn)[^\s"'<>]*)/gi,
-        // Script-embedded video URLs
         /["'](?:file|src|url)["']\s*:\s*["'](https?:\/\/[^"']+\.(?:mp4|m3u8|mkv|webm|mov|avi))["']/gi,
-        // Data attributes in script
         /data-src=["'](https?:\/\/[^"']+\.(?:mp4|m3u8|mkv|webm|mov|avi))["']/gi,
-        // Video-specific URLs
         /\b(https?:\/\/[^\s"'<>\{\}]*\/(?:embed|v|watch|player)[^\s"'<>\{\}]*)\b/gi
     ];
 
@@ -758,11 +1011,10 @@ const extractIframeSources = (htmlContent) => {
         }
     });
 
-    // Method 5: Extract from script tags - parse JWPlayer and similar configs
+    // Method 5: Extract from script tags
     $('script').each((i, el) => {
         const scriptContent = $(el).html();
         if (scriptContent) {
-            // JWPlayer patterns
             const jwplayerPatterns = [
                 /file\s*:\s*['"](https?:\/\/[^'"]+)['"]/gi,
                 /sources\s*:\s*\[\s*{\s*file\s*:\s*['"](https?:\/\/[^'"]+)['"]/gi,
@@ -791,7 +1043,6 @@ const extractIframeSources = (htmlContent) => {
 // Get video sources and servers for episode
 const getVideoSources = async (episodeId) => {
     try {
-        // Use FormData for proper encoding
         const formData = new URLSearchParams();
         formData.append('action', 'get_player_contents');
         formData.append('a', episodeId);
@@ -806,73 +1057,54 @@ const getVideoSources = async (episodeId) => {
             }
         );
 
-        // Parse the response - could be JSON or HTML
         let playerContent;
         try {
-            // Try parsing as JSON first
             playerContent = JSON.parse(data);
         } catch (e) {
-            // If JSON parsing fails, treat as array with single HTML content
             console.warn('Response was not JSON, treating as HTML content');
             playerContent = Array.isArray(data) ? data : [data];
         }
 
-        const mirrors = [];
+        const allSources = [];
         const serverMap = new Map();
 
-        // Process each mirror/player option
         if (Array.isArray(playerContent)) {
             for (let index = 0; index < playerContent.length; index++) {
                 const htmlContent = playerContent[index];
-                const mirrorId = index + 1;
-                const sources = [];
+                const mirrorIndex = index + 1;
 
-                // Extract iframe sources (improved method)
                 const iframeList = extractIframeSources(htmlContent);
                 
                 for (const iframe of iframeList) {
                     const serverName = extractServerName(iframe.src);
-                    sources.push({
+                    const sourceEntry = {
                         url: iframe.src,
-                        server: serverName,
+                        serverName,
                         type: 'iframe',
-                        extractionMethod: iframe.method
-                    });
+                        extractionMethod: iframe.method,
+                        mirrorIndex
+                    };
+                    allSources.push(sourceEntry);
 
-                    // Add to server map
                     if (!serverMap.has(serverName)) {
                         serverMap.set(serverName, []);
                     }
-                    serverMap.get(serverName).push({
-                        url: iframe.src,
-                        type: 'iframe',
-                        mirror: mirrorId
-                    });
+                    serverMap.get(serverName).push(sourceEntry);
 
-                    // Try to extract MP4 URL from iframe
                     try {
                         const mp4Url = await extractMp4FromIframe(iframe.src);
                         if (mp4Url) {
-                            sources.push({
+                            const mp4Entry = {
                                 url: mp4Url,
-                                server: serverName,
-                                type: 'mp4',
-                                extractedFrom: 'iframe'
-                            });
-
-                            // Add to server map
-                            if (!serverMap.has(serverName)) {
-                                serverMap.set(serverName, []);
-                            }
-                            serverMap.get(serverName).push({
-                                url: mp4Url,
+                                serverName,
                                 type: 'mp4',
                                 extractedFrom: 'iframe',
-                                mirror: mirrorId
-                            });
+                                mirrorIndex
+                            };
+                            allSources.push(mp4Entry);
+                            serverMap.get(serverName).push(mp4Entry);
                         }
                     } catch (e) {
-                        // Silently skip if MP4 extraction fails
                         console.debug('Could not extract MP4 from iframe:', iframe.src);
                     }
                 }
@@ -882,24 +1114,20 @@ const getVideoSources = async (episodeId) => {
                 $('source[type="video/mp4"]').each((i, el) => {
                     const src = $(el).attr('src') || $(el).attr('data-src');
                     if (src) {
-                        const quality = $(el).attr('data-quality') || 'unknown';
-                        sources.push({
+                        const quality = $(el).attr('data-quality') || null;
+                        const sourceEntry = {
                             url: src,
+                            serverName: 'Direct MP4',
                             quality,
-                            type: 'mp4'
-                        });
-
-                        // Add to server map
-                        const serverName = 'Direct MP4';
-                        if (!serverMap.has(serverName)) {
-                            serverMap.set(serverName, []);
-                        }
-                        serverMap.get(serverName).push({
-                            url: src,
                             type: 'mp4',
-                            quality,
-                            mirror: mirrorId
-                        });
+                            mirrorIndex
+                        };
+                        allSources.push(sourceEntry);
+
+                        if (!serverMap.has('Direct MP4')) {
+                            serverMap.set('Direct MP4', []);
+                        }
+                        serverMap.get('Direct MP4').push(sourceEntry);
                     }
                 });
 
@@ -907,27 +1135,24 @@ const getVideoSources = async (episodeId) => {
                 $('video').each((i, el) => {
                     const src = $(el).attr('src') || $(el).attr('data-src');
                     if (src) {
-                        sources.push({
+                        const sourceEntry = {
                             url: src,
-                            type: 'video'
-                        });
-
-                        const serverName = 'HTML5 Video';
-                        if (!serverMap.has(serverName)) {
-                            serverMap.set(serverName, []);
-                        }
-                        serverMap.get(serverName).push({
-                            url: src,
+                            serverName: 'HTML5 Video',
                             type: 'video',
-                            mirror: mirrorId
-                        });
+                            mirrorIndex
+                        };
+                        allSources.push(sourceEntry);
+
+                        if (!serverMap.has('HTML5 Video')) {
+                            serverMap.set('HTML5 Video', []);
+                        }
+                        serverMap.get('HTML5 Video').push(sourceEntry);
                     }
                 });
 
-                // Extract script-embedded sources (m3u8, mp4, etc)
+                // Extract script-embedded sources
                 const scripts = $('script').text();
                 if (scripts) {
-                    // Look for video file extensions
                     const videoPattern = /(https?:\/\/[^\s"'<>]*\.(mp4|m3u8|mkv|webm|mov|avi))/gi;
                     const matches = scripts.match(videoPattern);
                     if (matches) {
@@ -937,60 +1162,44 @@ const getVideoSources = async (episodeId) => {
                             if (!uniqueUrls.has(cleanUrl)) {
                                 uniqueUrls.add(cleanUrl);
                                 const extension = cleanUrl.match(/\.(\w+)$/)?.[1] || 'unknown';
-                                sources.push({
-                                    url: cleanUrl,
-                                    type: extension,
-                                    extractionMethod: 'script-pattern'
-                                });
-
                                 const serverName = extension.toUpperCase();
+                                const sourceEntry = {
+                                    url: cleanUrl,
+                                    serverName,
+                                    type: extension,
+                                    extractionMethod: 'script-pattern',
+                                    mirrorIndex
+                                };
+                                allSources.push(sourceEntry);
+
                                 if (!serverMap.has(serverName)) {
                                     serverMap.set(serverName, []);
                                 }
-                                serverMap.get(serverName).push({
-                                    url: cleanUrl,
-                                    type: extension,
-                                    mirror: mirrorId
-                                });
+                                serverMap.get(serverName).push(sourceEntry);
                             }
                         });
                     }
                 }
-
-                // Add this mirror if it has sources
-                if (sources.length > 0) {
-                    mirrors.push({
-                        id: mirrorId,
-                        sources: sources
-                    });
-                }
             }
         }
 
-        // Convert server map to array
-        const servers = [];
-        serverMap.forEach((sources, serverName) => {
-            servers.push({
-                name: serverName,
-                sources: sources
-            });
-        });
-
-        // Flatten all sources from mirrors into a single array
-        const allSources = [];
-        mirrors.forEach(mirror => {
-            allSources.push(...mirror.sources);
-        });
+        const servers = Array.from(serverMap.entries()).map(([serverName, sources]) => ({
+            serverName,
+            sources
+        }));
 
         return {
-            mirrors: mirrors.length > 0 ? mirrors : [],
             sources: allSources,
-            servers: servers.length > 0 ? servers : [],
-            total: playerContent ? playerContent.length : 0
+            servers,
+            totalMirrors: playerContent ? playerContent.length : 0
         };
     } catch (error) {
         console.error('Error getting video sources:', error.message);
-        return { mirrors: [], servers: [], error: error.message };
+        return { 
+            sources: [], 
+            servers: [], 
+            error: error.message 
+        };
     }
 };
 
@@ -1008,13 +1217,11 @@ const decodeIframeParam = (url) => {
     return null;
 };
 
-// Fetch and extract MP4 URL from new2.php or newjav.php endpoints
+// Fetch and extract MP4 URL from iframe endpoints
 const extractMp4FromIframe = async (iframeUrl) => {
     try {
-        // First try to decode the base64 parameter
         const decodedPath = decodeIframeParam(iframeUrl);
         if (decodedPath) {
-            // If it decodes to a path, try to fetch the actual video URL from the iframe page
             try {
                 const { data } = await axios.get(iframeUrl, {
                     headers: {
@@ -1022,7 +1229,6 @@ const extractMp4FromIframe = async (iframeUrl) => {
                     }
                 });
                 
-                // Try to extract video URL from JWPlayer config on the iframe page
                 const patterns = [
                     /"?file"?\s*:\s*"([^"]+(?:\.mp4|\.m3u8)[^"]*)"/gi,
                     /"?sources"?\s*:\s*\[\s*{\s*"?file"?\s*:\s*"([^"]+)"/gi,
@@ -1040,20 +1246,17 @@ const extractMp4FromIframe = async (iframeUrl) => {
                     }
                 }
             } catch (fetchError) {
-                // If fetching fails, just return the decoded path
+                // Continue to fallback
             }
             
-            // Return the decoded path if no full URL found
             if (decodedPath.startsWith('http')) {
                 return decodedPath;
             }
             return decodedPath;
         }
 
-        // If no base64 param, fetch the iframe and extract from JWPlayer config
         const { data } = await axios.get(iframeUrl);
         
-        // Try to extract from JWPlayer config
         const patterns = [
             /"?file"?\s*:\s*"([^"]+\.mp4[^"]*)"/gi,
             /"?sources"?\s*:\s*\[\s*{\s*"?file"?\s*:\s*"([^"]+)"/gi,
@@ -1082,31 +1285,29 @@ const extractMp4FromIframe = async (iframeUrl) => {
 const extractServerName = (url) => {
     if (!url) return 'Unknown';
     
-    // Check for PHP-based iframes (newjav.php, new2.php)
     if (url.includes('newjav.php') || url.includes('new2.php')) {
         return 'JWPlayer';
     }
     
     const serverPatterns = {
-        'streamwish': /streamwish\.com|wsh\.stream/i,
-        'turbovidblast': /turbovidblast\.com|turbovid\.stream/i,
-        'doodstream': /dood\.(?:watch|pm|to|re|ws)|doodstream/i,
-        'vidstream': /vidstream\.pro|vidsrc\./i,
-        'mp4upload': /mp4upload\.com/i,
-        'mixdrop': /mixdrop\.co|mixdrop\.cc/i,
-        'xstreamcdn': /xstreamcdn\.com/i,
-        'filelion': /filelion\.com/i,
-        'fembed': /fembed\.com|vanfem\.com/i,
-        'nozomi': /nozomi\.la/i
+        'StreamWish': /streamwish\.com|wsh\.stream/i,
+        'TurboVid': /turbovidblast\.com|turbovid\.stream/i,
+        'DoodStream': /dood\.(?:watch|pm|to|re|ws)|doodstream/i,
+        'VidStream': /vidstream\.pro|vidsrc\./i,
+        'MP4Upload': /mp4upload\.com/i,
+        'MixDrop': /mixdrop\.co|mixdrop\.cc/i,
+        'XStreamCDN': /xstreamcdn\.com/i,
+        'FileLion': /filelion\.com/i,
+        'Fembed': /fembed\.com|vanfem\.com/i,
+        'Nozomi': /nozomi\.la/i
     };
 
     for (const [name, pattern] of Object.entries(serverPatterns)) {
         if (pattern.test(url)) {
-            return name.charAt(0).toUpperCase() + name.slice(1);
+            return name;
         }
     }
 
-    // Extract domain as fallback
     try {
         const domain = new URL(url).hostname.split('.')[0];
         return domain.charAt(0).toUpperCase() + domain.slice(1);
@@ -1115,16 +1316,76 @@ const extractServerName = (url) => {
     }
 };
 
-// 2. Then export it
+// exports moved to bottom so `scrapeStudio` can be defined before exporting
+
+/**
+ * Scrape a studio/brand page with pagination.
+ * @param {string} studio - Studio slug (e.g. "t-rex")
+ * @param {number} page - Page number (1-based)
+ * @returns {Promise<Object>}
+ */
+const scrapeStudio = async (studio, page = 1) => {
+    const url = `${BASE_URL}/studio/${studio}${page > 1 ? `/page/${page}/` : '/'}`;
+    const { data } = await axios.get(url);
+    const $ = cheerio.load(data);
+
+    const results = [];
+    $('.items article.item').each((i, el) => {
+        const $el = $(el);
+        const title = $el.find('.data h3 a').text().trim() || $el.find('.data h3').text().trim();
+        const itemUrl = $el.find('.data h3 a').attr('href') || $el.find('.poster a').attr('href');
+        const slug = extractSlug(itemUrl);
+        const posterUrl = $el.find('.poster img').attr('data-src') || $el.find('.poster img').attr('src');
+        const year = $el.find('.data span').first().text().trim() || null;
+        const rating = $el.find('.rating').text().trim() || null;
+        if (slug) {
+            results.push({
+                slug,
+                title: title || null,
+                posterUrl: posterUrl || null,
+                year,
+                rating
+            });
+        }
+    });
+
+    // Pagination
+    let totalPages = 1;
+    $('.pagination a, .pagination span').each((i, el) => {
+        const num = parseInt($(el).text().trim(), 10);
+        if (!isNaN(num) && num > totalPages) totalPages = num;
+    });
+
+    const exists = results.length > 0 && page <= totalPages;
+
+    return {
+        provider: 'hentaimama',
+        type: 'studio',
+        data: {
+            studio,
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1,
+                exists
+            }
+        }
+    };
+};
+
 module.exports = {
     scrapeHome,
     scrapeInfo,
     scrapeEpisode,
     scrapeSeries,
     scrapeGenreList,
+    scrapeStudioList,
+    scrapeStudio,
     scrapeGenrePage,
+    advanceSearch,
     searchHentaimama,
-    hentaimamaSearch,
     getVideoSources,
     isVideoSource,
     extractServerName,
