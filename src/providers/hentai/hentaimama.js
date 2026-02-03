@@ -159,11 +159,21 @@ const scrapeHome = async () => {
         }
     });
 
+    // Monthly Releases
+    let monthlyReleases = [];
+    try {
+        const monthlyData = await scrapeNewMonthlyHentai(1);
+        monthlyReleases = monthlyData.data.results.slice(0, 8); // Limit to 8 items for home page
+    } catch (e) {
+        // Silently fail if unable to fetch monthly releases
+    }
+
     return {
         provider: 'hentaimama',
         type: 'home',
         data: {
             featured,
+            monthlyReleases,
             recentUncensored,
             recentSeries,
             recentEpisodes
@@ -718,12 +728,15 @@ const scrapeGenreList = async () => {
 
     results.sort((a, b) => a.name.localeCompare(b.name));
 
+    // Return structure matching public/docs/genre.json but include type and total count
+    const genres = results.map(r => r.slug).filter(Boolean);
+
     return {
         provider: 'hentaimama',
         type: 'genre-list',
         data: {
-            totalCount: results.length,
-            results
+            totalCount: genres.length,
+            genres
         }
     };
 };
@@ -1574,6 +1587,200 @@ const scrapeStudio = async (studio, page = 1) => {
     };
 };
 
+/**
+ * Scrape the new monthly hentai releases page.
+ * @param {number} [page=1] - Page number (1-based)
+ * @returns {Promise<Object>}
+ */
+const scrapeNewMonthlyHentai = async (page = 1) => {
+    const url = page === 1 
+        ? `${BASE_URL}/new-monthly-hentai/` 
+        : `${BASE_URL}/new-monthly-hentai/page/${page}/`;
+    
+    const response = await safeGet(url);
+    const data = response.data;
+    const $ = cheerio.load(data);
+
+    const results = [];
+    $('.items article.item').each((i, el) => {
+        const $el = $(el);
+        // Get series title and episode title
+        const seriesTitle = $el.find('.serie').text().trim();
+        const episodeTitle = $el.find('.data h3 a').text().trim() || $el.find('.data h3').text().trim();
+        const itemUrl = $el.find('.data h3 a').attr('href') || $el.find('.poster a').attr('href');
+        const slug = extractSlug(itemUrl);
+        const imageUrl = $el.find('.poster img').attr('data-src') || $el.find('.poster img').attr('src');
+        const releaseDate = $el.find('.data span').first().text().trim() || null;
+        const rating = $el.find('.rating').text().trim() || null;
+        
+        if (slug) {
+            results.push({
+                seriesTitle: seriesTitle || null,
+                episodeTitle: episodeTitle || null,
+                slug,
+                imageUrl: isValidImageUrl(imageUrl) ? imageUrl : null,
+                releaseDate,
+                rating
+            });
+        }
+    });
+
+    // Pagination
+    let totalPages = 1;
+    let hasNextPage = false;
+    
+    $('.pagination a, .pagination span').each((i, el) => {
+        const num = parseInt($(el).text().trim(), 10);
+        if (!isNaN(num) && num > totalPages) totalPages = num;
+        
+        if ($(el).hasClass('next')) {
+            hasNextPage = true;
+        }
+    });
+
+    return {
+        provider: 'hentaimama',
+        type: 'new-monthly-hentai',
+        data: {
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
+            }
+        }
+    };
+};
+
+/**
+ * Scrape the recent episodes page.
+ * @param {number} [page=1] - Page number (1-based)
+ * @returns {Promise<Object>}
+ */
+const scrapeRecentEpisodes = async (page = 1) => {
+    const url = page === 1 
+        ? `${BASE_URL}/recent-episodes/` 
+        : `${BASE_URL}/recent-episodes/page/${page}/`;
+    
+    const response = await safeGet(url);
+    const data = response.data;
+    const $ = cheerio.load(data);
+
+    const results = [];
+    $('.items article.item').each((i, el) => {
+        const $el = $(el);
+        const seriesTitle = $el.find('.serie').text().trim();
+        const episodeTitle = $el.find('.data h3').first().text().trim();
+        const itemUrl = $el.find('a').first().attr('href');
+        const slug = extractSlug(itemUrl);
+        const posterUrl = $el.find('img').attr('data-src') || $el.find('img').attr('src');
+        const releaseDate = $el.find('.data span').first().text().trim() || null;
+        const rating = $el.find('.rating').text().trim() || null;
+        
+        if (slug) {
+            results.push({
+                slug,
+                seriesTitle: seriesTitle || null,
+                episodeTitle: episodeTitle || null,
+                posterUrl: isValidImageUrl(posterUrl) ? posterUrl : null,
+                releaseDate,
+                rating
+            });
+        }
+    });
+
+    // Pagination
+    let totalPages = 1;
+    let hasNextPage = false;
+    
+    $('.pagination a, .pagination span').each((i, el) => {
+        const num = parseInt($(el).text().trim(), 10);
+        if (!isNaN(num) && num > totalPages) totalPages = num;
+        
+        if ($(el).hasClass('next')) {
+            hasNextPage = true;
+        }
+    });
+
+    return {
+        provider: 'hentaimama',
+        type: 'recent-episodes',
+        data: {
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
+            }
+        }
+    };
+};
+
+/**
+ * Scrape the TV shows archive page.
+ * @param {number} [page=1] - Page number (1-based)
+ * @returns {Promise<Object>}
+ */
+const scrapeTVShowsArchive = async (page = 1) => {
+    const url = page === 1 
+        ? `${BASE_URL}/tvshows/` 
+        : `${BASE_URL}/tvshows/page/${page}/`;
+    
+    const response = await safeGet(url);
+    const data = response.data;
+    const $ = cheerio.load(data);
+
+    const results = [];
+    $('.items article.item').each((i, el) => {
+        const $el = $(el);
+        const title = $el.find('.data h3 a').text().trim() || $el.find('.data h3').text().trim();
+        const itemUrl = $el.find('.data h3 a').attr('href') || $el.find('.poster a').attr('href');
+        const slug = extractSlug(itemUrl);
+        const posterUrl = $el.find('.poster img').attr('data-src') || $el.find('.poster img').attr('src');
+        const year = $el.find('.data span').first().text().trim() || null;
+        const rating = $el.find('.rating').text().trim() || null;
+        
+        if (slug) {
+            results.push({
+                slug,
+                title: title || null,
+                posterUrl: isValidImageUrl(posterUrl) ? posterUrl : null,
+                year,
+                rating
+            });
+        }
+    });
+
+    // Pagination
+    let totalPages = 1;
+    let hasNextPage = false;
+    
+    $('.pagination a, .pagination span').each((i, el) => {
+        const num = parseInt($(el).text().trim(), 10);
+        if (!isNaN(num) && num > totalPages) totalPages = num;
+        
+        if ($(el).hasClass('next')) {
+            hasNextPage = true;
+        }
+    });
+
+    return {
+        provider: 'hentaimama',
+        type: 'tv-shows-archive',
+        data: {
+            results,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
+            }
+        }
+    };
+};
+
 module.exports = {
     scrapeHome,
     scrapeInfo,
@@ -1584,6 +1791,9 @@ module.exports = {
     scrapeStudioList,
     scrapeStudio,
     scrapeGenrePage,
+    scrapeNewMonthlyHentai,
+    scrapeRecentEpisodes,
+    scrapeTVShowsArchive,
     advanceSearch,
     searchHentaimama,
     getVideoSources,

@@ -110,7 +110,10 @@ router.get('/', (req, res) => {
                 browse: [
                     'GET /api/hen/mama/home',
                     'GET /api/hen/mama/series/:page?',
-                    'GET /api/hen/mama/hentai-series/:page?&filter=weekly|monthly|alltime|alphabet'
+                    'GET /api/hen/mama/hentai-series/:page?&filter=weekly|monthly|alltime|alphabet',
+                    'GET /api/hen/mama/new-monthly/:page?',
+                    'GET /api/hen/mama/recent-episodes/:page?',
+                    'GET /api/hen/mama/tvshows/:page?'
                 ],
                 content: [
                     'GET /api/hen/mama/info/:id',
@@ -120,7 +123,8 @@ router.get('/', (req, res) => {
                     'GET /api/hen/mama/genre/:genre/:page?',
                     'GET /api/hen/mama/studio/:studio/:page?',
                     'GET /api/hen/mama/search/:query/:page?',
-                    'GET /api/hen/mama/advance-search?q=query&genre=genre&studio=studio&page=1'
+                    'GET /api/hen/mama/advance-search?q=query&genre=genre&studio=studio&page=1',
+                    'GET /api/hen/mama/new-monthly/:page?'
                 ]
             },
             mangakakalot: {
@@ -510,6 +514,24 @@ router.get('/hen/mama/hentai-series/:page?', (req, res) => {
     const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
     const filter = req.query.filter || null;
     handleResponse(res, hentaimama.scrapeHentaiSeries(page, filter));
+});
+
+// New: New monthly hentai releases
+router.get('/hen/mama/new-monthly/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
+    handleResponse(res, hentaimama.scrapeNewMonthlyHentai(page));
+});
+
+// New: Recent episodes
+router.get('/hen/mama/recent-episodes/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
+    handleResponse(res, hentaimama.scrapeRecentEpisodes(page));
+});
+
+// New: TV shows archive
+router.get('/hen/mama/tvshows/:page?', (req, res) => {
+    const page = req.params.page ? parseInt(req.params.page, 10) : (parseInt(req.query.page, 10) || 1);
+    handleResponse(res, hentaimama.scrapeTVShowsArchive(page));
 });
 
 // ----- Content Details -----
