@@ -148,13 +148,15 @@ const scrapeHome = async () => {
         const slug = extractSlug(url);
         const imageUrl = $el.find('img').attr('data-src') || $el.find('img').attr('src');
         const releaseDate = $el.find('.data span').first().text().trim();
+        const status = ($el.find('.status-sub, .status-raw').first().text() || '').trim() || null;
         if (seriesTitle && slug) {
             recentEpisodes.push({ 
                 seriesTitle, 
                 episodeTitle, 
                 slug, 
                 imageUrl, 
-                releaseDate 
+                releaseDate,
+                status
             });
         }
     });
