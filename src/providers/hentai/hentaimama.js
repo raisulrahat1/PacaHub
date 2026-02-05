@@ -1620,7 +1620,9 @@ const scrapeNewMonthlyHentai = async (page = 1) => {
                 slug,
                 imageUrl: isValidImageUrl(imageUrl) ? imageUrl : null,
                 releaseDate,
-                rating
+                rating,
+                // Detect whether this item is SUB or RAW (site uses .status-sub / .status-raw)
+                status: ($el.find('.status-sub, .status-raw').first().text() || '').trim() || null
             });
         }
     });
@@ -1685,7 +1687,9 @@ const scrapeRecentEpisodes = async (page = 1) => {
                 episodeTitle: episodeTitle || null,
                 posterUrl: isValidImageUrl(posterUrl) ? posterUrl : null,
                 releaseDate,
-                rating
+                rating,
+                // Add SUB / RAW status when available on the item
+                status: ($el.find('.status-sub, .status-raw').first().text() || '').trim() || null
             });
         }
     });
