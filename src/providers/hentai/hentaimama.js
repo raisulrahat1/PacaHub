@@ -768,10 +768,11 @@ const scrapeStudioList = async () => {
                 const $opt = $(optEl);
                 const value = $opt.attr('value');
                 const text = $opt.text().trim();
-                
-                if (value && text && value !== '' && !studiosMap.has(value)) {
-                    studiosMap.set(value, {
-                        slug: value,
+                const normalized = slugify(value || text);
+
+                if (normalized && text && !studiosMap.has(normalized)) {
+                    studiosMap.set(normalized, {
+                        slug: normalized,
                         name: text
                     });
                 }
@@ -788,11 +789,13 @@ const scrapeStudioList = async () => {
                 const href = $item.attr('href') || $item.attr('data-value') || $item.attr('value');
                 const text = $item.text().trim();
                 
-                if (href && text && !studiosMap.has(href)) {
+                if (href && text) {
                     const match = href.match(/\/(?:brand|studio|producer)\/([^\/]+)/i);
-                    if (match && match[1]) {
-                        studiosMap.set(href, {
-                            slug: match[1],
+                    const raw = match && match[1] ? match[1] : href;
+                    const normalized = slugify(raw || text);
+                    if (normalized && !studiosMap.has(normalized)) {
+                        studiosMap.set(normalized, {
+                            slug: normalized,
                             name: text
                         });
                     }
@@ -808,11 +811,13 @@ const scrapeStudioList = async () => {
             const href = $el.attr('href');
             const text = $el.text().trim();
             
-            if (href && text && !text.includes('←') && !text.includes('→') && text.length > 0 && !studiosMap.has(href)) {
+            if (href && text && !text.includes('←') && !text.includes('→') && text.length > 0) {
                 const match = href.match(/\/(?:brand|studio|producer)\/([^\/]+)/i);
-                if (match && match[1]) {
-                    studiosMap.set(href, {
-                        slug: match[1],
+                const raw = match && match[1] ? match[1] : href;
+                const normalized = slugify(raw || text);
+                if (normalized && !studiosMap.has(normalized)) {
+                    studiosMap.set(normalized, {
+                        slug: normalized,
                         name: text
                     });
                 }
@@ -1808,4 +1813,14 @@ module.exports = {
     extractIframeSources,
     decodeIframeParam,
     extractMp4FromIframe
+};
+
+// Normalize text into a slug: lowercase, spaces -> hyphens, remove unsafe chars
+const slugify = (text) => {
+    if (!text) return null;
+    return String(text).toLowerCase().trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
 };
