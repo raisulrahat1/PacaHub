@@ -1,20 +1,23 @@
 {
   "version": 2,
-  "name": "pacahub",
   "builds": [
     {
-      "src": "src/index.js",
+      "src": "api/server.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "src/index.js"
+      "dest": "api/server.js"
+    },
+    {
+      "src": "/docs(.*)",
+      "dest": "api/server.js"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "api/server.js"
     }
   ]
 }
