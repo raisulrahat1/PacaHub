@@ -1,11 +1,13 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const cheerio = require('cheerio');
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.json());
+const cors = require('cors');
 
 const apiRoutes = require('../src/routes/api');
 
@@ -39,3 +41,4 @@ app.listen(PORT, () => {
 });
 
 module.exports = app; 
+
