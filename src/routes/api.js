@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const hentaitv = require('../providers/hentai/hentaitv');
 const hentaicity = require('../providers/hentai/hentaicity');
+const yfantasy = require('../providers/yfantasy/yfantasy');
 
 
 // Helper function to handle responses
@@ -22,6 +23,36 @@ router.get('/hen/tv/random', (req, res) => handleResponse(res, hentaitv.scrapeRa
 router.get('/hen/tv/brand/:brand', (req, res) =>
     handleResponse(res, hentaitv.scrapeBrand(req.params.brand, req.query.page || 1))
 );
+
+// YFantasy endpoints
+router.get('/yf/feed', (req, res) =>
+    handleResponse(
+        res,
+        yfantasy.scrapeFeed({
+            limit: req.query.limit,
+            offset: req.query.offset,
+            sort: req.query.sort,
+            gender: req.query.gender
+        })
+    )
+);
+router.get('/yf/series', (req, res) => handleResponse(res, yfantasy.scrapeSeriesList({ gender: req.query.gender })));
+router.get('/yf/series/:key', (req, res) =>
+    handleResponse(res, yfantasy.scrapeSeries(req.params.key, { gender: req.query.gender }))
+);
+router.get('/yf/info/:id', (req, res) =>
+    handleResponse(res, yfantasy.scrapeInfo(req.params.id, { gender: req.query.gender }))
+);
+router.get('/yf/watch/:id', (req, res) =>
+    handleResponse(res, yfantasy.scrapeWatch(req.params.id, { gender: req.query.gender }))
+);
+router.get('/yf/search/:query', (req, res) =>
+    handleResponse(
+        res,
+        yfantasy.scrapeSearch(req.params.query, { limit: req.query.limit, gender: req.query.gender })
+    )
+);
+router.get('/yf/random', (req, res) => handleResponse(res, yfantasy.scrapeRandom({ gender: req.query.gender })));
 
 // HentaiCity endpoints
 router.get('/hen/city/info/:id', (req, res) => handleResponse(res, hentaicity.scrapeInfo(req.params.id)));

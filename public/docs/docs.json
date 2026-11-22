@@ -29,5 +29,23 @@
                 ]
             }
         ]
+    },
+    "yfantasy": {
+        "provider": [
+            {
+                "name": "YFantasy",
+                "url": "https://yfantasy.me",
+                "note": "Female (beautiful girl) content only. Every endpoint accepts ?gender=girl|boy; male requests are answered from the same female-only catalog with a note.",
+                "endpoint": [
+                    "/api/yf/feed?limit=&offset=&sort=newest|oldest&gender=girl",
+                    "/api/yf/series",
+                    "/api/yf/series/:name-or-id",
+                    "/api/yf/info/:id",
+                    "/api/yf/watch/:id",
+                    "/api/yf/search/:query?limit=",
+                    "/api/yf/random"
+                ]
+            }
+        ]
     }
 }

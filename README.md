@@ -21,6 +21,7 @@
 - [API Documentation](#-api-documentation)
   - [HentaiTV](#-hentaitv)
   - [HentaiCity](#-hentaicity)
+  - [YFantasy](#-yfantasy)
 - [Supported Providers](#-supported-providers)
 - [Examples](#-examples)
 - [Contributing](#-contributing)
@@ -96,7 +97,21 @@ The API will be available at `http://localhost:3000`.
 | `/api/hen/hentaicity/recent` | Get recently added videos | None |
 | `/api/hen/hentaicity/popular` | Get popular videos | None |
 
-For more detailed information and examples, visit the `/docs` endpoint in the API.
+### 💫 YFantasy
+
+Female (beautiful girl) content only. Every endpoint accepts a `gender` query parameter (`girl` or `boy`); male requests are answered from the same female-only catalog with an explanatory note.
+
+| Endpoint | Description | Parameters |
+|----------|-------------|------------|
+| `/api/yf/feed` | Full catalog with metadata and direct links | `limit`, `offset`, `sort=newest\|oldest`, `gender` |
+| `/api/yf/series` | All series with episode counts | `gender` |
+| `/api/yf/series/:name-or-id` | Every episode of one series with direct links | `name-or-id`: series name or collection ID |
+| `/api/yf/info/:id` | Episode metadata, all segments and series episode list | `id`: video ID |
+| `/api/yf/watch/:id` | Fresh HLS/MP4 playback links | `id`: video ID |
+| `/api/yf/search/:query` | Search the catalog | `query`: search term, `limit` |
+| `/api/yf/random` | Random video | `gender` |
+
+Signed playback links expire after about an hour, so fetch them again instead of storing them.
 
 ---
 
@@ -110,6 +125,7 @@ PacaHub currently integrates with the following content sources:
 |----------|--------|-------------|----------|
 | 🎥 **HentaiTV** | ✅ Running | Adult Videos | Search, Random, Recent, Trending, Watch, Info, Genre |
 | 🔞 **HentaiCity** | ✅ Running | Adult Videos | Recent, Popular |
+| 💫 **YFantasy** | ✅ Running | AI Adult Videos | Feed, Series, Episodes, Info, Watch, Search, Random |
 
 </div>
 
