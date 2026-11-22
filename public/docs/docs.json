@@ -1,23 +1,4 @@
 {
-    "manga": {
-        "provider": [
-            {
-                "name": "MangaKakalot",
-                "url": "https://www.mangakakalot.gg/",
-                "endpoint": [
-                    "/api/manga/kakalot/search/:query/:page",
-                    "/api/manga/kakalot/latest/:page",
-                    "/api/manga/kakalot/popular/:page",
-                    "/api/manga/kakalot/newest/:page",
-                    "/api/manga/kakalot/completed/:page",
-                    "/api/manga/kakalot/popular-now",
-                    "/api/manga/kakalot/home",
-                    "/api/manga/kakalot/details/:id",
-                    "/api/manga/kakalot/read/:mangaId?/:chapterId?"
-                ]
-            }
-        ]
-    },
     "hentai": {
         "provider": [
             {
@@ -45,37 +26,6 @@
                     "/api/hen/city/info/:id"
 
 
-                ]
-            }
-        ]
-    },
-    "anime": {
-        "provider": [
-            {
-                "name": "AniDubPro",
-                "url": "https://animedub.pro",
-                "endpoint": [
-                    "/api/anime/anidubpro/list/:page"
-                ]
-            }
-        ]
-    },
-    "jav": {
-        "provider": [
-            {
-                "name": "JavGG",
-                "url": "https://javgg.net",
-                "endpoint": [
-                    "/api/jav/javgg/recent/:page",
-                    "/api/jav/javgg/featured/:page",
-                    "/api/jav/javgg/trending/:page",
-                    "/api/jav/javgg/search/:query/:page",
-                    "/api/jav/javgg/info/:id",
-                    "/api/jav/javgg/servers/:id",
-                    "/api/jav/javgg/watch/:id",
-                    "/api/jav/javgg/watch/:id/:serverId",
-                    "/api/jav/javgg/random/:page",
-                    "/api/jav/javgg/genre/:genre (visit docs/genre for more info)"
                 ]
             }
         ]

@@ -19,7 +19,6 @@
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [API Documentation](#-api-documentation)
-  - [MangaKakalot](#-mangakakalot)
   - [HentaiTV](#-hentaitv)
   - [HentaiCity](#-hentaicity)
 - [Supported Providers](#-supported-providers)
@@ -77,20 +76,6 @@ The API will be available at `http://localhost:3000`.
 
 ## 📚 API Documentation
 
-### 📖 MangaKakalot
-
-| Endpoint | Description | Parameters |
-|----------|-------------|------------|
-| `/api/manga/kakalot/search/:query/:page` | Search for manga | `query`: Search term<br>`page`: Page number (optional) |
-| `/api/manga/kakalot/latest/:page` | Get latest manga | `page`: Page number (optional) |
-| `/api/manga/kakalot/popular/:page` | Get popular manga | `page`: Page number (optional) |
-| `/api/manga/kakalot/newest/:page` | Get newest manga | `page`: Page number (optional) |
-| `/api/manga/kakalot/completed/:page` | Get completed manga | `page`: Page number (optional) |
-| `/api/manga/kakalot/popular-now` | Get currently popular manga | None |
-| `/api/manga/kakalot/home` | Get homepage content | None |
-| `/api/manga/kakalot/details/:id` | Get manga details | `id`: Manga ID |
-| `/api/manga/kakalot/read/:mangaId?/:chapterId?` | Read manga chapter | `mangaId`: Manga ID<br>`chapterId`: Chapter ID |
-
 ### 🎥 HentaiTV
 
 | Endpoint | Description | Parameters |
@@ -123,7 +108,6 @@ PacaHub currently integrates with the following content sources:
 
 | Provider | Status | Content Type | Features |
 |----------|--------|-------------|----------|
-| 📖 **MangaKakalot** | ✅ Running | Manga | Search, Latest, Popular, Details, Read |
 | 🎥 **HentaiTV** | ✅ Running | Adult Videos | Search, Random, Recent, Trending, Watch, Info, Genre |
 | 🔞 **HentaiCity** | ✅ Running | Adult Videos | Recent, Popular |
 
